@@ -1,0 +1,16 @@
+{
+  "name": "yt-downloader",
+  "version": "1.0.0",
+  "description": "YouTube to MP4 downloader web server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
