@@ -171,7 +171,10 @@ app.get('/api/download', (req, res) => {
     const downloadToken = crypto.randomBytes(16).toString('hex');
     // Store token→file mapping in memory briefly
     app.locals.tokens = app.locals.tokens || {};
-    app.locals.tokens[downloadToken] = finalFilename;
+    app.locals.tokens[downloadToken] = {
+      path: finalFilename,
+      name: path.basename(finalFilename).replace(`.${jobId}`, '')
+    };
     setTimeout(() => {
       delete app.locals.tokens[downloadToken];
     }, 5 * 60 * 1000);
@@ -189,14 +192,17 @@ app.get('/api/download', (req, res) => {
 app.get('/api/file/:token', (req, res) => {
   const { token } = req.params;
   const tokens = app.locals.tokens || {};
-  const filePath = tokens[token];
+  const tokenData = tokens[token];
+  const filePath = tokenData?.path;
 
   if (!filePath || !fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'File not found or expired' });
   }
 
-  // const filename = path.basename(filePath);
-  const filename = path.basename(filePath).replace(`.${jobId}`, '');
+  const filename = tokenData.name
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/[:"*?<>|]/g, '')
+    .trim();
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.setHeader('Content-Type', 'video/mp4');
   res.sendFile(filePath, (err) => {
