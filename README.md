@@ -1,104 +1,70 @@
 # YTDL — YouTube MP4 Downloader
 
-A local web server that lets you paste a YouTube URL and download it as an MP4.
+A self-hosted web server for downloading YouTube videos as MP4s. Supports single videos, playlists, and batch URLs with a queue UI and ZIP export.
 
 ## Quick Setup (Ubuntu/Debian)
-
-A setup script is included that handles everything automatically:
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-This will install all dependencies, run `npm install`, and optionally set up a systemd service so YTDL starts on boot. If you're on Ubuntu/Debian, this is the recommended way to get started.
+Installs dependencies, runs `npm install`, and optionally creates a systemd service. Then open **http://localhost:3000**.
 
 ---
 
 ## Manual Setup
 
-If you're not on a Debian-based system or prefer to install things yourself:
+### Requirements
 
-### 1. Node.js (v18+)
-```bash
-node --version
-```
+- **Node.js v18+**
+- **yt-dlp** — install via pipx, not apt
 
-### 2. yt-dlp
+  > `apt install python3-yt-dlp` ships a stale version that breaks with HTTP 400/403 errors. Always use pipx or pip to get a current build.
 
-> **⚠️ Do not use `apt install python3-yt-dlp` on Ubuntu.** Canonical's package repos
-> lag far behind upstream — you'll likely get a version from 2024 or earlier, which
-> will fail with HTTP 400/403 errors due to outdated YouTube player extraction logic.
-> Always install yt-dlp via pipx or pip to get a current version.
+  ```bash
+  sudo apt install pipx
+  pipx install yt-dlp
+  pipx ensurepath   # restart your shell after this
+  ```
 
-```bash
-# Recommended: pipx (manages its own isolated environment, no venv needed)
-sudo apt install pipx
-pipx install yt-dlp
-pipx ensurepath  # adds ~/.local/bin to PATH — restart your shell after this
+  To upgrade later: `pipx upgrade yt-dlp`
 
-# Alternative: pip
-pip install yt-dlp  # may require --break-system-packages on Ubuntu 24.04+
+- **ffmpeg** — required for merging video and audio streams
 
-# macOS
-brew install yt-dlp
+  ```bash
+  sudo apt install ffmpeg        # Ubuntu/Debian
+  brew install ffmpeg            # macOS
+  winget install ffmpeg          # Windows
+  ```
 
-# Windows
-winget install yt-dlp
-# or download yt-dlp.exe from https://github.com/yt-dlp/yt-dlp/releases
-```
-
-> **Note on `pipx ensurepath`:** This adds `~/.local/bin` to your shell's PATH so the
-> `yt-dlp` command is found. It takes effect on your next login or after running
-> `source ~/.bashrc`. The setup script handles this automatically.
-
-Keep yt-dlp up to date — YouTube regularly changes their player and old versions break:
-```bash
-pipx upgrade yt-dlp
-```
-
-### 3. ffmpeg (required for merging video+audio for best quality)
-```bash
-# Ubuntu/Debian
-sudo apt install ffmpeg
-
-# macOS
-brew install ffmpeg
-
-# Windows
-winget install ffmpeg
-# or download from https://ffmpeg.org/download.html
-```
-
-### 4. Install Node dependencies and start
+### Install and run
 
 ```bash
 npm install
 npm start
 ```
 
-Then open **http://localhost:3000** in your browser.
-
 ---
 
 ## Usage
 
-1. Paste a YouTube URL into the input field
-2. Click **Fetch** to preview the video
-3. Select your desired quality (Best / 1080p / 720p / 480p)
-4. Click **Download MP4**
-5. Watch the progress bar — your browser will prompt you to save the file when done
+**Single mode** — paste one URL, preview the video, pick a quality, download.
+
+**Batch mode** — paste multiple URLs (one per line) or a playlist link. Videos are fetched into a queue with checkboxes. Download individual files or select multiple and export as a ZIP.
+
+Quality options: Best / 1080p / 720p / 480p
+
+---
 
 ## Notes
 
-- Downloaded files are auto-deleted from the server after 10 minutes
-- Files are served once, then cleaned up immediately after transfer
-- Works with standard YouTube videos and Shorts
-- Age-restricted or private videos will not work
+- Temp files are deleted from the server 10 minutes after download
+- Files are cleaned up immediately after being served
+- Age-restricted and private videos will not work
 
 ## Development
 
 ```bash
-# Auto-restart on file changes (Node 18+)
-npm run dev
+npm run dev   # auto-restarts on file changes (Node 18+)
 ```

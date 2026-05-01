@@ -34,7 +34,6 @@
       overflow-x: hidden;
     }
 
-    /* Noise texture overlay */
     body::before {
       content: '';
       position: fixed;
@@ -47,15 +46,12 @@
 
     .container {
       width: 100%;
-      max-width: 640px;
+      max-width: 680px;
       position: relative;
       z-index: 1;
     }
 
-    /* Header */
-    header {
-      margin-bottom: 52px;
-    }
+    header { margin-bottom: 52px; }
 
     .logo-row {
       display: flex;
@@ -70,12 +66,9 @@
       font-weight: 800;
       letter-spacing: -2px;
       line-height: 1;
-      color: var(--text);
     }
 
-    .logo span {
-      color: var(--accent);
-    }
+    .logo span { color: var(--accent); }
 
     .tagline {
       font-family: var(--mono);
@@ -85,17 +78,44 @@
       text-transform: uppercase;
     }
 
-    /* Divider */
     .divider {
       height: 1px;
       background: linear-gradient(to right, var(--accent), transparent);
       margin: 20px 0 28px;
     }
 
-    /* URL input area */
-    .input-section {
+    /* ── Mode toggle ── */
+    .mode-toggle {
+      display: flex;
+      gap: 0;
       margin-bottom: 20px;
+      border: 1px solid var(--border);
+      width: fit-content;
     }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 8px 18px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+    }
+
+    .mode-btn:not(.active):hover { color: var(--text); }
+
+    /* ── Input section ── */
+    .input-section { margin-bottom: 20px; }
 
     .input-label {
       font-family: var(--mono);
@@ -107,10 +127,7 @@
       display: block;
     }
 
-    .url-row {
-      display: flex;
-      gap: 0;
-    }
+    .url-row { display: flex; }
 
     .url-input {
       flex: 1;
@@ -123,12 +140,29 @@
       padding: 14px 16px;
       outline: none;
       transition: border-color 0.2s;
-      border-radius: 0;
-      -webkit-appearance: none;
     }
 
     .url-input::placeholder { color: var(--muted); }
     .url-input:focus { border-color: var(--accent); }
+
+    .url-textarea {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-right: none;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+      resize: vertical;
+      min-height: 100px;
+      line-height: 1.8;
+    }
+
+    .url-textarea::placeholder { color: var(--muted); }
+    .url-textarea:focus { border-color: var(--accent); }
 
     .fetch-btn {
       background: var(--accent);
@@ -143,17 +177,19 @@
       text-transform: uppercase;
       transition: background 0.15s, transform 0.1s;
       white-space: nowrap;
+      align-self: stretch;
     }
 
     .fetch-btn:hover { background: #f4ff70; }
     .fetch-btn:active { transform: scale(0.97); }
     .fetch-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
 
-    /* Quality selector */
+    /* ── Quality selector ── */
     .quality-row {
       display: flex;
       gap: 8px;
       margin-top: 12px;
+      align-items: center;
     }
 
     .quality-label {
@@ -162,8 +198,6 @@
       color: var(--muted);
       letter-spacing: 1px;
       text-transform: uppercase;
-      display: flex;
-      align-items: center;
       margin-right: 4px;
     }
 
@@ -181,7 +215,7 @@
     .quality-btn:hover { border-color: var(--accent); color: var(--text); }
     .quality-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.07); }
 
-    /* Video preview card */
+    /* ── Single video preview ── */
     #preview-card {
       display: none;
       background: var(--surface);
@@ -191,16 +225,7 @@
       animation: slideIn 0.3s ease;
     }
 
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .preview-inner {
-      display: flex;
-      gap: 14px;
-      align-items: flex-start;
-    }
+    .preview-inner { display: flex; gap: 14px; align-items: flex-start; }
 
     .thumb {
       width: 120px;
@@ -222,15 +247,210 @@
       text-overflow: ellipsis;
     }
 
-    .video-sub {
+    .video-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .video-sub span { color: var(--accent); margin-right: 12px; }
+
+    /* ── Batch queue ── */
+    #batch-queue { display: none; margin-bottom: 20px; animation: slideIn 0.3s ease; }
+
+    .queue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .queue-title {
       font-family: var(--mono);
       font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
       color: var(--muted);
     }
 
-    .video-sub span { color: var(--accent); margin-right: 12px; }
+    .queue-title span { color: var(--accent); }
 
-    /* Download button */
+    .queue-actions { display: flex; gap: 8px; align-items: center; }
+
+    .text-btn {
+      background: none;
+      border: none;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 4px 8px;
+      transition: color 0.15s;
+      color: var(--muted);
+    }
+
+    .text-btn:hover { color: var(--accent); }
+    .text-btn.danger:hover { color: var(--accent2); }
+
+    .queue-list { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
+
+    .queue-list::-webkit-scrollbar { width: 4px; }
+    .queue-list::-webkit-scrollbar-track { background: transparent; }
+    .queue-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .queue-item {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      transition: border-color 0.15s;
+    }
+
+    .queue-item.selected { border-color: var(--accent); }
+    .queue-item.downloading { border-color: #555; }
+    .queue-item.done { border-color: #2a4a2a; }
+    .queue-item.failed { border-color: var(--accent2); opacity: 0.6; }
+
+    /* Custom checkbox */
+    .item-checkbox {
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--muted);
+      flex-shrink: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .item-checkbox.checked {
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    .item-checkbox.checked::after {
+      content: '✓';
+      font-size: 10px;
+      color: #000;
+      font-weight: 700;
+    }
+
+    .queue-item.done .item-checkbox,
+    .queue-item.downloading .item-checkbox {
+      pointer-events: none;
+      opacity: 0.4;
+    }
+
+    .item-thumb {
+      width: 80px;
+      height: 45px;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      background: var(--border);
+    }
+
+    .item-meta { flex: 1; min-width: 0; }
+
+    .item-title {
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 3px;
+    }
+
+    .item-sub {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .item-sub .dur { color: var(--accent); margin-right: 10px; }
+
+    .item-status {
+      font-family: var(--mono);
+      font-size: 10px;
+      flex-shrink: 0;
+      text-align: right;
+      min-width: 80px;
+    }
+
+    .item-progress-track {
+      height: 2px;
+      background: var(--border);
+      margin-top: 5px;
+      display: none;
+    }
+
+    .item-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    .item-dl-btn {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 5px 10px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .item-dl-btn:hover { background: var(--accent); color: #000; }
+    .item-dl-btn:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; background: transparent; }
+
+    /* ── Batch action bar ── */
+    #batch-action-bar {
+      display: none;
+      margin-bottom: 20px;
+      gap: 10px;
+      animation: slideIn 0.2s ease;
+    }
+
+    .batch-dl-btn {
+      flex: 1;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .batch-dl-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--accent);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.2s;
+      z-index: 0;
+    }
+
+    .batch-dl-btn:hover::before { transform: scaleX(1); }
+    .batch-dl-btn:hover { color: #000; }
+    .batch-dl-btn span { position: relative; z-index: 1; }
+    .batch-dl-btn:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
+    .batch-dl-btn:disabled::before { display: none; }
+
+    /* ── Single download button ── */
     .download-btn {
       width: 100%;
       background: transparent;
@@ -267,6 +487,37 @@
     .download-btn:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
     .download-btn:disabled::before { display: none; }
 
+    /* ── Progress (single) ── */
+    #progress-area {
+      display: none;
+      margin-bottom: 20px;
+      animation: slideIn 0.3s ease;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .progress-status { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 1px; }
+    .progress-stats { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+    .progress-track { height: 3px; background: var(--border); position: relative; overflow: hidden; }
+
+    .progress-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; width: 0%; }
+
+    .progress-shimmer {
+      position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      animation: shimmer 1.5s infinite;
+    }
+
+    @keyframes shimmer { to { left: 150%; } }
+
+    .progress-percent { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 6px; text-align: right; }
+
     .cancel-btn {
       width: 100%;
       background: transparent;
@@ -286,70 +537,7 @@
 
     .cancel-btn:hover { background: rgba(255,71,71,0.1); }
 
-    /* Progress area */
-    #progress-area {
-      display: none;
-      margin-bottom: 20px;
-      animation: slideIn 0.3s ease;
-    }
-
-    .progress-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .progress-status {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent);
-      letter-spacing: 1px;
-    }
-
-    .progress-stats {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .progress-track {
-      height: 3px;
-      background: var(--border);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: var(--accent);
-      transition: width 0.3s ease;
-      width: 0%;
-    }
-
-    .progress-shimmer {
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 60%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-      animation: shimmer 1.5s infinite;
-    }
-
-    @keyframes shimmer {
-      to { left: 150%; }
-    }
-
-    .progress-percent {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 6px;
-      text-align: right;
-    }
-
-    /* Status / error messages */
+    /* ── Status message ── */
     #status-msg {
       font-family: var(--mono);
       font-size: 12px;
@@ -358,20 +546,12 @@
       background: rgba(232,255,71,0.04);
       display: none;
       animation: slideIn 0.3s ease;
+      margin-bottom: 16px;
     }
 
-    #status-msg.error {
-      border-color: var(--accent2);
-      background: rgba(255,71,71,0.06);
-      color: var(--accent2);
-    }
+    #status-msg.error { border-color: var(--accent2); background: rgba(255,71,71,0.06); color: var(--accent2); }
+    #status-msg.success { border-color: var(--accent); color: var(--accent); }
 
-    #status-msg.success {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    /* Footer */
     footer {
       margin-top: auto;
       padding-top: 40px;
@@ -382,22 +562,17 @@
       text-align: center;
     }
 
-    /* Spinner for fetch */
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
     .spinner {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      border: 2px solid #000;
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
+      display: inline-block; width: 10px; height: 10px;
+      border: 2px solid #000; border-top-color: transparent;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+      vertical-align: middle; margin-right: 6px;
     }
 
-    /* Pulse for indeterminate */
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
     .pulsing { animation: pulse 1.4s ease-in-out infinite; }
   </style>
 </head>
@@ -411,20 +586,22 @@
       <div class="divider"></div>
     </header>
 
+    <!-- Mode toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-single">Single</button>
+      <button class="mode-btn" id="mode-batch">Batch</button>
+    </div>
+
+    <!-- Input -->
     <div class="input-section">
-      <label class="input-label" for="url-input">Paste YouTube URL</label>
+      <label class="input-label" id="input-label">Paste YouTube URL</label>
       <div class="url-row">
-        <input
-          id="url-input"
-          class="url-input"
-          type="text"
-          placeholder="https://youtube.com/watch?v=..."
-          autocomplete="off"
-          spellcheck="false"
-        />
+        <input id="url-input" class="url-input" type="text"
+          placeholder="https://youtube.com/watch?v=..." autocomplete="off" spellcheck="false" />
+        <textarea id="url-textarea" class="url-textarea" style="display:none"
+          placeholder="https://youtube.com/watch?v=...&#10;https://youtube.com/playlist?list=...&#10;https://youtu.be/..." spellcheck="false"></textarea>
         <button id="fetch-btn" class="fetch-btn">Fetch</button>
       </div>
-
       <div class="quality-row">
         <span class="quality-label">Quality:</span>
         <button class="quality-btn active" data-q="best">Best</button>
@@ -434,6 +611,7 @@
       </div>
     </div>
 
+    <!-- Single: preview card -->
     <div id="preview-card">
       <div class="preview-inner">
         <img id="thumb" class="thumb" src="" alt="thumbnail" />
@@ -441,16 +619,16 @@
           <div id="video-title" class="video-title"></div>
           <div class="video-sub">
             <span id="video-duration"></span>
-            <span id="video-uploader" style="color: var(--muted)"></span>
+            <span id="video-uploader" style="color:var(--muted)"></span>
           </div>
         </div>
       </div>
     </div>
 
-    <button id="download-btn" class="download-btn">
-      <span>⬇ Download MP4</span>
-    </button>
+    <!-- Single: download button -->
+    <button id="download-btn" class="download-btn"><span>⬇ Download MP4</span></button>
 
+    <!-- Single: progress -->
     <div id="progress-area">
       <div class="progress-header">
         <span id="progress-status" class="progress-status pulsing">DOWNLOADING</span>
@@ -464,27 +642,94 @@
       <button id="cancel-btn" class="cancel-btn">✕ Cancel Download</button>
     </div>
 
+    <!-- Batch: queue -->
+    <div id="batch-queue">
+      <div class="queue-header">
+        <span class="queue-title">Queue — <span id="queue-count">0</span> video(s)</span>
+        <div class="queue-actions">
+          <button class="text-btn" id="select-all-btn">Select All</button>
+          <button class="text-btn" id="deselect-all-btn">Deselect All</button>
+          <button class="text-btn danger" id="clear-queue-btn">Clear</button>
+        </div>
+      </div>
+      <div class="queue-list" id="queue-list"></div>
+    </div>
+
+    <!-- Batch: action bar -->
+    <div id="batch-action-bar" style="display:none; margin-bottom:20px;">
+      <div style="display:flex; gap:10px;">
+        <button class="batch-dl-btn" id="dl-selected-btn"><span id="dl-selected-label">⬇ Download Selected (0)</span></button>
+        <button class="batch-dl-btn" id="dl-all-btn"><span>⬇ Download All as ZIP</span></button>
+      </div>
+    </div>
+
     <div id="status-msg"></div>
 
     <footer>For personal use only · Respect copyright &amp; YouTube ToS</footer>
   </div>
 
   <script>
-    const urlInput = document.getElementById('url-input');
-    const fetchBtn = document.getElementById('fetch-btn');
-    const previewCard = document.getElementById('preview-card');
-    const downloadBtn = document.getElementById('download-btn');
-    const progressArea = document.getElementById('progress-area');
-    const statusMsg = document.getElementById('status-msg');
-
-    const cancelBtn = document.getElementById('cancel-btn');
-
+    // ── State ──────────────────────────────────────────────────────────────────
+    let mode = 'single';
     let selectedQuality = 'best';
     let currentUrl = '';
     let activeJobId = null;
     let activeEvtSource = null;
 
-    // Quality selector
+    // Batch: array of { url, title, uploader, duration, thumbnail, state, token, jobId, evtSource }
+    let queue = [];
+
+    // ── DOM refs ───────────────────────────────────────────────────────────────
+    const urlInput      = document.getElementById('url-input');
+    const urlTextarea   = document.getElementById('url-textarea');
+    const fetchBtn      = document.getElementById('fetch-btn');
+    const inputLabel    = document.getElementById('input-label');
+    const previewCard   = document.getElementById('preview-card');
+    const downloadBtn   = document.getElementById('download-btn');
+    const progressArea  = document.getElementById('progress-area');
+    const cancelBtn     = document.getElementById('cancel-btn');
+    const statusMsg     = document.getElementById('status-msg');
+    const batchQueue    = document.getElementById('batch-queue');
+    const queueList     = document.getElementById('queue-list');
+    const queueCount    = document.getElementById('queue-count');
+    const batchActionBar = document.getElementById('batch-action-bar');
+    const dlSelectedBtn = document.getElementById('dl-selected-btn');
+    const dlSelectedLabel = document.getElementById('dl-selected-label');
+    const dlAllBtn      = document.getElementById('dl-all-btn');
+
+    // ── Mode toggle ────────────────────────────────────────────────────────────
+    document.getElementById('mode-single').addEventListener('click', () => setMode('single'));
+    document.getElementById('mode-batch').addEventListener('click',  () => setMode('batch'));
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('mode-single').classList.toggle('active', m === 'single');
+      document.getElementById('mode-batch').classList.toggle('active',  m === 'batch');
+
+      if (m === 'single') {
+        urlInput.style.display = '';
+        urlTextarea.style.display = 'none';
+        inputLabel.textContent = 'Paste YouTube URL';
+        fetchBtn.style.display = '';
+        batchQueue.style.display = 'none';
+        batchActionBar.style.display = 'none';
+      } else {
+        urlInput.style.display = 'none';
+        urlTextarea.style.display = '';
+        inputLabel.textContent = 'Paste URLs or a playlist link (one per line)';
+        fetchBtn.style.display = '';
+        previewCard.style.display = 'none';
+        downloadBtn.style.display = 'none';
+        progressArea.style.display = 'none';
+        if (queue.length > 0) {
+          batchQueue.style.display = 'block';
+          batchActionBar.style.display = 'block';
+        }
+      }
+      hideStatus();
+    }
+
+    // ── Quality selector ───────────────────────────────────────────────────────
     document.querySelectorAll('.quality-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('active'));
@@ -493,15 +738,14 @@
       });
     });
 
+    // ── Status helpers ─────────────────────────────────────────────────────────
     function showStatus(msg, type = 'info') {
       statusMsg.textContent = msg;
       statusMsg.className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
       statusMsg.style.display = 'block';
     }
 
-    function hideStatus() {
-      statusMsg.style.display = 'none';
-    }
+    function hideStatus() { statusMsg.style.display = 'none'; }
 
     function setProgress(percent, stats) {
       document.getElementById('progress-fill').style.width = percent + '%';
@@ -509,11 +753,11 @@
       if (stats) document.getElementById('progress-stats').textContent = stats;
     }
 
-    // Fetch video info
-    fetchBtn.addEventListener('click', fetchInfo);
-    urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') fetchInfo(); });
+    // ── Fetch ──────────────────────────────────────────────────────────────────
+    fetchBtn.addEventListener('click', () => mode === 'single' ? fetchSingle() : fetchBatch());
+    urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') fetchSingle(); });
 
-    async function fetchInfo() {
+    async function fetchSingle() {
       const url = urlInput.value.trim();
       if (!url) return;
 
@@ -530,11 +774,7 @@
           body: JSON.stringify({ url }),
         });
         const data = await res.json();
-
-        if (!res.ok) {
-          showStatus(data.error || 'Failed to fetch video info', 'error');
-          return;
-        }
+        if (!res.ok) { showStatus(data.error || 'Failed to fetch video info', 'error'); return; }
 
         document.getElementById('thumb').src = data.thumbnail;
         document.getElementById('video-title').textContent = data.title;
@@ -544,7 +784,7 @@
         currentUrl = url;
         previewCard.style.display = 'block';
         downloadBtn.style.display = 'block';
-      } catch (e) {
+      } catch {
         showStatus('Network error — is the server running?', 'error');
       } finally {
         fetchBtn.disabled = false;
@@ -552,14 +792,254 @@
       }
     }
 
-    // Cancel download
+    async function fetchBatch() {
+      const raw = urlTextarea.value.trim();
+      if (!raw) return;
+
+      const urls = raw.split('\n').map(l => l.trim()).filter(Boolean);
+      if (urls.length === 0) return;
+
+      fetchBtn.disabled = true;
+      fetchBtn.innerHTML = '<span class="spinner"></span>Fetching';
+      hideStatus();
+
+      try {
+        const res = await fetch('/api/info/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urls }),
+        });
+        const data = await res.json();
+        if (!res.ok) { showStatus(data.error || 'Failed to fetch info', 'error'); return; }
+
+        if (data.errors && data.errors.length > 0) {
+          showStatus(`${data.errors.length} URL(s) could not be fetched and were skipped.`, 'error');
+        }
+
+        if (data.videos && data.videos.length > 0) {
+          data.videos.forEach(v => {
+            queue.push({ ...v, state: 'idle', selected: true, token: null, jobId: null, evtSource: null });
+          });
+          renderQueue();
+          batchQueue.style.display = 'block';
+          batchActionBar.style.display = 'block';
+          urlTextarea.value = '';
+        }
+      } catch {
+        showStatus('Network error — is the server running?', 'error');
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = 'Fetch';
+      }
+    }
+
+    // ── Queue rendering ────────────────────────────────────────────────────────
+    function renderQueue() {
+      queueList.innerHTML = '';
+      queueCount.textContent = queue.length;
+
+      queue.forEach((item, i) => {
+        const el = document.createElement('div');
+        el.className = `queue-item ${item.state === 'done' ? 'done' : item.state === 'downloading' ? 'downloading' : item.state === 'failed' ? 'failed' : item.selected ? 'selected' : ''}`;
+        el.dataset.index = i;
+
+        const thumbSrc = item.thumbnail || '';
+
+        el.innerHTML = `
+          <div class="item-checkbox ${item.selected && item.state === 'idle' ? 'checked' : ''}" data-i="${i}"></div>
+          <img class="item-thumb" src="${thumbSrc}" alt="" onerror="this.style.visibility='hidden'" />
+          <div class="item-meta">
+            <div class="item-title">${escHtml(item.title)}</div>
+            <div class="item-sub">
+              <span class="dur">${item.duration || ''}</span>
+              <span>${escHtml(item.uploader || '')}</span>
+            </div>
+            <div class="item-progress-track" id="track-${i}" style="${item.state === 'downloading' ? 'display:block' : ''}">
+              <div class="item-progress-fill" id="fill-${i}"></div>
+            </div>
+          </div>
+          <div class="item-status" id="status-${i}">${statusLabel(item)}</div>
+          ${item.state === 'idle' ? `<button class="item-dl-btn" data-i="${i}">⬇ DL</button>` : ''}
+          ${item.state === 'done' && item.token ? `<button class="item-dl-btn" data-i="${i}" data-token="${item.token}">Save</button>` : ''}
+        `;
+
+        queueList.appendChild(el);
+      });
+
+      // Checkbox clicks
+      queueList.querySelectorAll('.item-checkbox').forEach(cb => {
+        cb.addEventListener('click', () => {
+          const i = parseInt(cb.dataset.i);
+          if (queue[i].state !== 'idle') return;
+          queue[i].selected = !queue[i].selected;
+          renderQueue();
+          updateBatchActionBar();
+        });
+      });
+
+      // Individual download buttons
+      queueList.querySelectorAll('.item-dl-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = parseInt(btn.dataset.i);
+          if (btn.dataset.token) {
+            triggerFileDownload(btn.dataset.token);
+          } else {
+            startItemDownload(i);
+          }
+        });
+      });
+
+      updateBatchActionBar();
+    }
+
+    function statusLabel(item) {
+      if (item.state === 'downloading') return `<span style="color:var(--accent)" class="pulsing">DOWNLOADING</span>`;
+      if (item.state === 'done')        return `<span style="color:#4caf50">✔ DONE</span>`;
+      if (item.state === 'failed')      return `<span style="color:var(--accent2)">✘ FAILED</span>`;
+      if (item.state === 'zipping')     return `<span style="color:var(--accent)" class="pulsing">ZIPPING</span>`;
+      return '';
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function updateBatchActionBar() {
+      const selectedCount = queue.filter(i => i.selected && i.state === 'idle').length;
+      const doneCount = queue.filter(i => i.state === 'done' && i.token).length;
+
+      dlSelectedLabel.textContent = `⬇ Download Selected (${selectedCount})`;
+      dlSelectedBtn.disabled = selectedCount === 0;
+      dlAllBtn.disabled = doneCount === 0;
+    }
+
+    // ── Queue controls ─────────────────────────────────────────────────────────
+    document.getElementById('select-all-btn').addEventListener('click', () => {
+      queue.forEach(item => { if (item.state === 'idle') item.selected = true; });
+      renderQueue();
+    });
+
+    document.getElementById('deselect-all-btn').addEventListener('click', () => {
+      queue.forEach(item => { if (item.state === 'idle') item.selected = false; });
+      renderQueue();
+    });
+
+    document.getElementById('clear-queue-btn').addEventListener('click', () => {
+      // Kill active downloads
+      queue.forEach(item => {
+        if (item.evtSource) item.evtSource.close();
+        if (item.jobId) fetch(`/api/download/${item.jobId}`, { method: 'DELETE' }).catch(() => {});
+      });
+      queue = [];
+      renderQueue();
+      batchQueue.style.display = 'none';
+      batchActionBar.style.display = 'none';
+    });
+
+    // ── Individual item download ───────────────────────────────────────────────
+    function startItemDownload(i) {
+      const item = queue[i];
+      item.state = 'downloading';
+      item.selected = false;
+      renderQueue();
+
+      const encodedUrl = encodeURIComponent(item.url);
+      const evtSource = new EventSource(`/api/download?url=${encodedUrl}&quality=${selectedQuality}`);
+      item.evtSource = evtSource;
+
+      evtSource.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+
+        if (msg.type === 'jobId') {
+          item.jobId = msg.jobId;
+        } else if (msg.type === 'progress') {
+          const fill = document.getElementById(`fill-${i}`);
+          const track = document.getElementById(`track-${i}`);
+          const statusEl = document.getElementById(`status-${i}`);
+          if (fill) { track.style.display = 'block'; fill.style.width = msg.percent + '%'; }
+          if (statusEl) statusEl.innerHTML = `<span style="color:var(--muted);font-family:var(--mono);font-size:10px">${msg.percent.toFixed(0)}%</span>`;
+        } else if (msg.type === 'done') {
+          evtSource.close();
+          item.state = 'done';
+          item.token = msg.token;
+          item.evtSource = null;
+          renderQueue();
+          updateBatchActionBar();
+        } else if (msg.type === 'error') {
+          evtSource.close();
+          item.state = 'failed';
+          item.evtSource = null;
+          renderQueue();
+        }
+      };
+
+      evtSource.onerror = () => {
+        evtSource.close();
+        item.state = 'failed';
+        item.evtSource = null;
+        renderQueue();
+      };
+    }
+
+    // ── Batch download selected ────────────────────────────────────────────────
+    dlSelectedBtn.addEventListener('click', () => {
+      const targets = queue.map((item, i) => ({ item, i })).filter(({ item }) => item.selected && item.state === 'idle');
+      targets.forEach(({ i }) => startItemDownload(i));
+    });
+
+    // ── Download all as ZIP ────────────────────────────────────────────────────
+    dlAllBtn.addEventListener('click', async () => {
+      const doneItems = queue.filter(i => i.state === 'done' && i.token);
+      if (doneItems.length === 0) return;
+
+      dlAllBtn.disabled = true;
+      dlAllBtn.querySelector('span').textContent = '⏳ Building ZIP...';
+
+      try {
+        const res = await fetch('/api/zip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tokens: doneItems.map(i => i.token) }),
+        });
+
+        if (!res.ok) {
+          showStatus('Failed to build ZIP.', 'error');
+          return;
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ytdl-batch.zip';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        // Mark tokens as consumed
+        doneItems.forEach(item => { item.token = null; item.state = 'idle'; });
+        renderQueue();
+        showStatus('ZIP download started.', 'success');
+      } catch {
+        showStatus('Network error building ZIP.', 'error');
+      } finally {
+        dlAllBtn.disabled = false;
+        dlAllBtn.querySelector('span').textContent = '⬇ Download All as ZIP';
+      }
+    });
+
+    // ── Single file token download ─────────────────────────────────────────────
+    function triggerFileDownload(token) {
+      const a = document.createElement('a');
+      a.href = `/api/file/${token}`;
+      a.click();
+    }
+
+    // ── Single video download ──────────────────────────────────────────────────
     cancelBtn.addEventListener('click', async () => {
       if (!activeJobId) return;
       cancelBtn.disabled = true;
       cancelBtn.textContent = 'Cancelling...';
-      try {
-        await fetch(`/api/download/${activeJobId}`, { method: 'DELETE' });
-      } catch (e) { /* server may have already closed */ }
+      try { await fetch(`/api/download/${activeJobId}`, { method: 'DELETE' }); } catch {}
       if (activeEvtSource) activeEvtSource.close();
       resetDownloadState();
       showStatus('Download cancelled.', 'error');
@@ -576,12 +1056,10 @@
       document.getElementById('progress-status').classList.add('pulsing');
     }
 
-    // Download
-    downloadBtn.addEventListener('click', startDownload);
+    downloadBtn.addEventListener('click', startSingleDownload);
 
-    function startDownload() {
+    function startSingleDownload() {
       if (!currentUrl) return;
-
       downloadBtn.disabled = true;
       progressArea.style.display = 'block';
       cancelBtn.style.display = 'block';
@@ -589,8 +1067,7 @@
       hideStatus();
       setProgress(0, '');
 
-      const encodedUrl = encodeURIComponent(currentUrl);
-      const evtSource = new EventSource(`/api/download?url=${encodedUrl}&quality=${selectedQuality}`);
+      const evtSource = new EventSource(`/api/download?url=${encodeURIComponent(currentUrl)}&quality=${selectedQuality}`);
       activeEvtSource = evtSource;
 
       evtSource.onmessage = (e) => {
@@ -605,14 +1082,8 @@
           setProgress(100, '');
           document.getElementById('progress-status').textContent = 'COMPLETE';
           document.getElementById('progress-status').classList.remove('pulsing');
-
-          // Trigger file download
-          const link = document.createElement('a');
-          link.href = `/api/file/${msg.token}`;
-          link.click();
-
+          triggerFileDownload(msg.token);
           showStatus('Download ready! Your file should start saving.', 'success');
-
           setTimeout(() => resetDownloadState(), 3000);
         } else if (msg.type === 'error') {
           evtSource.close();
