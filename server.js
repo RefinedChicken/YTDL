@@ -85,7 +85,7 @@ app.get('/api/download', (req, res) => {
 
   const decodedUrl = decodeURIComponent(url);
   const jobId = crypto.randomBytes(8).toString('hex');
-  const outputTemplate = path.join(DOWNLOAD_DIR, `${jobId}.%(ext)s`);
+  const outputTemplate = path.join(DOWNLOAD_DIR, `${jobId}.%(uploader)s - %(title)s.%(ext)s`);
 
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
