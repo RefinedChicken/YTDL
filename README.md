@@ -1,6 +1,8 @@
-# YTDL — YouTube MP4 Downloader
+> ⚠️ **Work in progress:** This project is actively being developed. Features may change and bugs may occur.
 
-A self-hosted web server for downloading YouTube videos as MP4s. Supports single videos, playlists, and batch URLs with a queue UI and ZIP export.
+# Meet YTDL. A sleek and simple WebUI for yt-dlp
+
+A self-hosted web server for downloading YouTube videos as MP4s. Query and download videos from any valid YouTube video or playlist URL in 480p, 720p, 1080p or best quality. Batch URLs are supported, as well as a customizable download queue and .zip archived bulk downloads.
 
 ## Quick Setup (Ubuntu/Debian)
 
@@ -9,33 +11,17 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-Installs dependencies, runs `npm install`, and optionally creates a systemd service. Then open **http://localhost:3000**.
-
 ---
 
 ## Manual Setup
 
-### Requirements
-
-- **Node.js v18+**
-- **yt-dlp** — install via pipx, not apt
-
-  > `apt install python3-yt-dlp` ships a stale version that breaks with HTTP 400/403 errors. Always use pipx or pip to get a current build.
+### Install Dependencies
 
   ```bash
-  sudo apt install pipx
-  pipx install yt-dlp
+  sudo apt update
+  sudo apt install npm pipx ffmpeg
+  pipx install yt-dlp   # To upgrade: pipx upgrade yt-dlp
   pipx ensurepath   # restart your shell after this
-  ```
-
-  To upgrade later: `pipx upgrade yt-dlp`
-
-- **ffmpeg** — required for merging video and audio streams
-
-  ```bash
-  sudo apt install ffmpeg        # Ubuntu/Debian
-  brew install ffmpeg            # macOS
-  winget install ffmpeg          # Windows
   ```
 
 ### Install and run
@@ -52,8 +38,6 @@ npm start
 **Single mode** — paste one URL, preview the video, pick a quality, download.
 
 **Batch mode** — paste multiple URLs (one per line) or a playlist link. Videos are fetched into a queue with checkboxes. Download individual files or select multiple and export as a ZIP.
-
-Quality options: Best / 1080p / 720p / 480p
 
 ---
 
