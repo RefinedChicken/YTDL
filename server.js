@@ -85,8 +85,8 @@ app.get('/api/download', (req, res) => {
 
   const decodedUrl = decodeURIComponent(url);
   const jobId = crypto.randomBytes(8).toString('hex');
-  const outputTemplate = path.join(DOWNLOAD_DIR, `${jobId}.%(uploader)s - %(title)s.%(ext)s`);
-
+  // const outputTemplate = path.join(DOWNLOAD_DIR, `${jobId}.%(uploader)s - %(title)s.%(ext)s`);
+  const outputTemplate = path.join(DOWNLOAD_DIR, `%(title)s - %(uploader)s.${jobId}.%(ext)s`);
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -195,7 +195,8 @@ app.get('/api/file/:token', (req, res) => {
     return res.status(404).json({ error: 'File not found or expired' });
   }
 
-  const filename = path.basename(filePath);
+  // const filename = path.basename(filePath);
+  const filename = path.basename(filePath).replace(`.${jobId}`, '');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.setHeader('Content-Type', 'video/mp4');
   res.sendFile(filePath, (err) => {
