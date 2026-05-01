@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const archiver = require('archiver');
 
 const app = express();
-const PORT = 3000;
+const PORT = 80;
 const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
 
 if (!fs.existsSync(DOWNLOAD_DIR)) {
