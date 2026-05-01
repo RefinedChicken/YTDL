@@ -267,25 +267,6 @@
     .download-btn:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; }
     .download-btn:disabled::before { display: none; }
 
-    .cancel-btn {
-      width: 100%;
-      background: transparent;
-      border: 1px solid var(--accent2);
-      color: var(--accent2);
-      font-family: var(--mono);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      padding: 10px;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-top: 10px;
-      display: none;
-    }
-
-    .cancel-btn:hover { background: rgba(255,71,71,0.1); }
-
     /* Progress area */
     #progress-area {
       display: none;
@@ -461,7 +442,6 @@
         <div class="progress-shimmer"></div>
       </div>
       <div id="progress-percent" class="progress-percent">0%</div>
-      <button id="cancel-btn" class="cancel-btn">✕ Cancel Download</button>
     </div>
 
     <div id="status-msg"></div>
@@ -477,12 +457,8 @@
     const progressArea = document.getElementById('progress-area');
     const statusMsg = document.getElementById('status-msg');
 
-    const cancelBtn = document.getElementById('cancel-btn');
-
     let selectedQuality = 'best';
     let currentUrl = '';
-    let activeJobId = null;
-    let activeEvtSource = null;
 
     // Quality selector
     document.querySelectorAll('.quality-btn').forEach(btn => {
@@ -552,30 +528,6 @@
       }
     }
 
-    // Cancel download
-    cancelBtn.addEventListener('click', async () => {
-      if (!activeJobId) return;
-      cancelBtn.disabled = true;
-      cancelBtn.textContent = 'Cancelling...';
-      try {
-        await fetch(`/api/download/${activeJobId}`, { method: 'DELETE' });
-      } catch (e) { /* server may have already closed */ }
-      if (activeEvtSource) activeEvtSource.close();
-      resetDownloadState();
-      showStatus('Download cancelled.', 'error');
-    });
-
-    function resetDownloadState() {
-      activeJobId = null;
-      activeEvtSource = null;
-      progressArea.style.display = 'none';
-      cancelBtn.style.display = 'none';
-      cancelBtn.disabled = false;
-      cancelBtn.textContent = '✕ Cancel Download';
-      downloadBtn.disabled = false;
-      document.getElementById('progress-status').classList.add('pulsing');
-    }
-
     // Download
     downloadBtn.addEventListener('click', startDownload);
 
@@ -584,21 +536,17 @@
 
       downloadBtn.disabled = true;
       progressArea.style.display = 'block';
-      cancelBtn.style.display = 'block';
       document.getElementById('progress-status').textContent = 'DOWNLOADING';
       hideStatus();
       setProgress(0, '');
 
       const encodedUrl = encodeURIComponent(currentUrl);
       const evtSource = new EventSource(`/api/download?url=${encodedUrl}&quality=${selectedQuality}`);
-      activeEvtSource = evtSource;
 
       evtSource.onmessage = (e) => {
         const msg = JSON.parse(e.data);
 
-        if (msg.type === 'jobId') {
-          activeJobId = msg.jobId;
-        } else if (msg.type === 'progress') {
+        if (msg.type === 'progress') {
           setProgress(msg.percent, `${msg.size} · ${msg.speed}`);
         } else if (msg.type === 'done') {
           evtSource.close();
@@ -612,19 +560,25 @@
           link.click();
 
           showStatus('Download ready! Your file should start saving.', 'success');
+          downloadBtn.disabled = false;
 
-          setTimeout(() => resetDownloadState(), 3000);
+          setTimeout(() => {
+            progressArea.style.display = 'none';
+            document.getElementById('progress-status').classList.add('pulsing');
+          }, 3000);
         } else if (msg.type === 'error') {
           evtSource.close();
-          resetDownloadState();
+          progressArea.style.display = 'none';
           showStatus(msg.message || 'Download failed', 'error');
+          downloadBtn.disabled = false;
         }
       };
 
       evtSource.onerror = () => {
         evtSource.close();
-        resetDownloadState();
+        progressArea.style.display = 'none';
         showStatus('Connection lost during download.', 'error');
+        downloadBtn.disabled = false;
       };
     }
   </script>

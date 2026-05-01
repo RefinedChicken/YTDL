@@ -119,12 +119,6 @@ app.get('/api/download', (req, res) => {
   const ytdlp = spawn('yt-dlp', args);
   let finalFilename = null;
 
-  // Track active job for cancellation
-  app.locals.jobs = app.locals.jobs || {};
-  app.locals.jobs[jobId] = ytdlp;
-
-  send({ type: 'jobId', jobId });
-
   ytdlp.stdout.on('data', (data) => {
     const lines = data.toString().split('\n');
     lines.forEach(line => {
@@ -156,8 +150,6 @@ app.get('/api/download', (req, res) => {
   });
 
   ytdlp.on('close', (code) => {
-    delete (app.locals.jobs || {})[jobId];
-
     if (code !== 0) {
       send({ type: 'error', message: 'Download failed. The video may be unavailable or restricted.' });
       return res.end();
@@ -194,30 +186,6 @@ app.get('/api/download', (req, res) => {
   req.on('close', () => {
     ytdlp.kill();
   });
-});
-
-// Cancel an active download job
-app.delete('/api/download/:jobId', (req, res) => {
-  const { jobId } = req.params;
-  const jobs = app.locals.jobs || {};
-  const job = jobs[jobId];
-
-  if (!job) {
-    return res.status(404).json({ error: 'Job not found or already complete' });
-  }
-
-  job.kill('SIGTERM');
-  delete jobs[jobId];
-
-  // Clean up any partial files
-  try {
-    const files = fs.readdirSync(DOWNLOAD_DIR).filter(f => f.includes(jobId));
-    files.forEach(f => fs.unlinkSync(path.join(DOWNLOAD_DIR, f)));
-  } catch (e) {
-    console.warn('Cleanup after cancel failed:', e.message);
-  }
-
-  res.json({ success: true });
 });
 
 // Serve the file via token
