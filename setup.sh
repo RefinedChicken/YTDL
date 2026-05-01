@@ -110,5 +110,5 @@ fi
 echo ""
 echo -e "${BOLD}────────────────────────────────────${NC}"
 echo -e "${GREEN}${BOLD}Setup complete!${NC}"
-echo -e "Open ${CYAN}http://localhost:3000${NC} in your browser."
+echo -e "Open ${CYAN}http://localhost${NC} in your browser."
 echo -e "${YELLOW}Note: You may need to restart your shell for yt-dlp to be on PATH.${NC}\n"
