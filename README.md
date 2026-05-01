@@ -1,8 +1,8 @@
-> ⚠️ **Work in progress:** This project is actively being developed. Features may change and bugs may occur.
+> ⚠️ **Work in progress:** YTDL is actively being developed. Features may change and bugs may occur.
 
-# Meet YTDL. A sleek and simple WebUI for yt-dlp
+# YTDL: A sleek WebUI for yt-dlp
 
-A self-hosted web server for downloading YouTube videos as MP4s. Query and download videos from any valid YouTube video or playlist URL in 480p, 720p, 1080p or best quality. Batch URLs are supported, as well as a customizable download queue and .zip archived bulk downloads.
+Web server that downloads YouTube videos as MP4s. Query and download videos from any valid YouTube video or playlist URL in 480p, 720p, 1080p or best quality. Batch URLs are supported, as well as a customizable download queue and .zip archived bulk downloads.
 
 ## Quick Setup (Ubuntu/Debian)
 
@@ -20,7 +20,7 @@ chmod +x setup.sh
   ```bash
   sudo apt update
   sudo apt install npm pipx ffmpeg
-  pipx install yt-dlp   # To upgrade: pipx upgrade yt-dlp
+  pipx install yt-dlp   # To upgrade use pipx upgrade yt-dlp
   pipx ensurepath   # restart your shell after this
   ```
 
