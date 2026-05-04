@@ -408,6 +408,21 @@
     .item-dl-btn:hover { background: var(--accent); color: #000; }
     .item-dl-btn:disabled { border-color: var(--border); color: var(--muted); cursor: not-allowed; background: transparent; }
 
+    .item-cancel-btn {
+      background: transparent;
+      border: 1px solid var(--accent2);
+      color: var(--accent2);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 5px 10px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .item-cancel-btn:hover { background: rgba(255,71,71,0.1); }
+
     /* ── Batch action bar ── */
     #batch-action-bar {
       display: none;
@@ -608,6 +623,7 @@
         <button class="quality-btn" data-q="1080p">1080p</button>
         <button class="quality-btn" data-q="720p">720p</button>
         <button class="quality-btn" data-q="480p">480p</button>
+        <button class="quality-btn" data-q="mp3">MP3</button>
       </div>
     </div>
 
@@ -657,10 +673,7 @@
 
     <!-- Batch: action bar -->
     <div id="batch-action-bar" style="display:none; margin-bottom:20px;">
-      <div style="display:flex; gap:10px;">
-        <button class="batch-dl-btn" id="dl-selected-btn"><span id="dl-selected-label">⬇ Download Selected (0)</span></button>
-        <button class="batch-dl-btn" id="dl-all-btn"><span>⬇ Download All as ZIP</span></button>
-      </div>
+      <button class="batch-dl-btn" id="dl-zip-btn"><span id="dl-zip-label">⬇ Download Selected as ZIP (0)</span></button>
     </div>
 
     <div id="status-msg"></div>
@@ -676,26 +689,25 @@
     let activeJobId = null;
     let activeEvtSource = null;
 
-    // Batch: array of { url, title, uploader, duration, thumbnail, state, token, jobId, evtSource }
+    // Batch: array of { url, title, uploader, duration, thumbnail, state, token, jobId, evtSource, _cancel }
     let queue = [];
 
     // ── DOM refs ───────────────────────────────────────────────────────────────
-    const urlInput      = document.getElementById('url-input');
-    const urlTextarea   = document.getElementById('url-textarea');
-    const fetchBtn      = document.getElementById('fetch-btn');
-    const inputLabel    = document.getElementById('input-label');
-    const previewCard   = document.getElementById('preview-card');
-    const downloadBtn   = document.getElementById('download-btn');
-    const progressArea  = document.getElementById('progress-area');
-    const cancelBtn     = document.getElementById('cancel-btn');
-    const statusMsg     = document.getElementById('status-msg');
-    const batchQueue    = document.getElementById('batch-queue');
-    const queueList     = document.getElementById('queue-list');
-    const queueCount    = document.getElementById('queue-count');
+    const urlInput       = document.getElementById('url-input');
+    const urlTextarea    = document.getElementById('url-textarea');
+    const fetchBtn       = document.getElementById('fetch-btn');
+    const inputLabel     = document.getElementById('input-label');
+    const previewCard    = document.getElementById('preview-card');
+    const downloadBtn    = document.getElementById('download-btn');
+    const progressArea   = document.getElementById('progress-area');
+    const cancelBtn      = document.getElementById('cancel-btn');
+    const statusMsg      = document.getElementById('status-msg');
+    const batchQueue     = document.getElementById('batch-queue');
+    const queueList      = document.getElementById('queue-list');
+    const queueCount     = document.getElementById('queue-count');
     const batchActionBar = document.getElementById('batch-action-bar');
-    const dlSelectedBtn = document.getElementById('dl-selected-btn');
-    const dlSelectedLabel = document.getElementById('dl-selected-label');
-    const dlAllBtn      = document.getElementById('dl-all-btn');
+    const dlZipBtn       = document.getElementById('dl-zip-btn');
+    const dlZipLabel     = document.getElementById('dl-zip-label');
 
     // ── Mode toggle ────────────────────────────────────────────────────────────
     document.getElementById('mode-single').addEventListener('click', () => setMode('single'));
@@ -735,6 +747,7 @@
         document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         selectedQuality = btn.dataset.q;
+        downloadBtn.querySelector('span').textContent = btn.dataset.q === 'mp3' ? '⬇ Download MP3' : '⬇ Download MP4';
       });
     });
 
@@ -817,9 +830,19 @@
         }
 
         if (data.videos && data.videos.length > 0) {
+          const existingIds  = new Set(queue.map(q => q.id));
+          const existingUrls = new Set(queue.map(q => q.url));
+          let added = 0;
           data.videos.forEach(v => {
-            queue.push({ ...v, state: 'idle', selected: true, token: null, jobId: null, evtSource: null });
+            if (!existingIds.has(v.id) && !existingUrls.has(v.url)) {
+              queue.push({ ...v, state: 'idle', selected: true, token: null, jobId: null, evtSource: null, _cancel: null });
+              existingIds.add(v.id);
+              existingUrls.add(v.url);
+              added++;
+            }
           });
+          const skipped = data.videos.length - added;
+          if (skipped > 0) showStatus(`${skipped} duplicate(s) skipped.`, 'info');
           renderQueue();
           batchQueue.style.display = 'block';
           batchActionBar.style.display = 'block';
@@ -860,6 +883,7 @@
           </div>
           <div class="item-status" id="status-${i}">${statusLabel(item)}</div>
           ${item.state === 'idle' ? `<button class="item-dl-btn" data-i="${i}">⬇ DL</button>` : ''}
+          ${item.state === 'downloading' ? `<button class="item-cancel-btn" data-i="${i}">✕</button>` : ''}
           ${item.state === 'done' && item.token ? `<button class="item-dl-btn" data-i="${i}" data-token="${item.token}">Save</button>` : ''}
         `;
 
@@ -889,6 +913,14 @@
         });
       });
 
+      // Individual cancel buttons
+      queueList.querySelectorAll('.item-cancel-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = parseInt(btn.dataset.i);
+          if (queue[i]._cancel) queue[i]._cancel();
+        });
+      });
+
       updateBatchActionBar();
     }
 
@@ -906,11 +938,8 @@
 
     function updateBatchActionBar() {
       const selectedCount = queue.filter(i => i.selected && i.state === 'idle').length;
-      const doneCount = queue.filter(i => i.state === 'done' && i.token).length;
-
-      dlSelectedLabel.textContent = `⬇ Download Selected (${selectedCount})`;
-      dlSelectedBtn.disabled = selectedCount === 0;
-      dlAllBtn.disabled = doneCount === 0;
+      dlZipLabel.textContent = `⬇ Download Selected as ZIP (${selectedCount})`;
+      dlZipBtn.disabled = selectedCount === 0;
     }
 
     // ── Queue controls ─────────────────────────────────────────────────────────
@@ -925,9 +954,9 @@
     });
 
     document.getElementById('clear-queue-btn').addEventListener('click', () => {
-      // Kill active downloads
       queue.forEach(item => {
-        if (item.evtSource) item.evtSource.close();
+        if (item._cancel) item._cancel();
+        else if (item.evtSource) item.evtSource.close();
         if (item.jobId) fetch(`/api/download/${item.jobId}`, { method: 'DELETE' }).catch(() => {});
       });
       queue = [];
@@ -938,93 +967,123 @@
 
     // ── Individual item download ───────────────────────────────────────────────
     function startItemDownload(i) {
-      const item = queue[i];
-      item.state = 'downloading';
-      item.selected = false;
-      renderQueue();
+      return new Promise((resolve) => {
+        const item = queue[i];
+        let settled = false;
 
-      const encodedUrl = encodeURIComponent(item.url);
-      const evtSource = new EventSource(`/api/download?url=${encodedUrl}&quality=${selectedQuality}`);
-      item.evtSource = evtSource;
+        function finish(token) {
+          if (settled) return;
+          settled = true;
+          resolve(token);
+        }
 
-      evtSource.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-
-        if (msg.type === 'jobId') {
-          item.jobId = msg.jobId;
-        } else if (msg.type === 'progress') {
-          const fill = document.getElementById(`fill-${i}`);
-          const track = document.getElementById(`track-${i}`);
-          const statusEl = document.getElementById(`status-${i}`);
-          if (fill) { track.style.display = 'block'; fill.style.width = msg.percent + '%'; }
-          if (statusEl) statusEl.innerHTML = `<span style="color:var(--muted);font-family:var(--mono);font-size:10px">${msg.percent.toFixed(0)}%</span>`;
-        } else if (msg.type === 'done') {
-          evtSource.close();
-          item.state = 'done';
-          item.token = msg.token;
-          item.evtSource = null;
+        item._cancel = () => {
+          if (item.evtSource) { item.evtSource.close(); item.evtSource = null; }
+          if (item.jobId) { fetch(`/api/download/${item.jobId}`, { method: 'DELETE' }).catch(() => {}); item.jobId = null; }
+          item.state = 'idle';
+          item.selected = true;
+          item._cancel = null;
+          finish(null);
           renderQueue();
           updateBatchActionBar();
-        } else if (msg.type === 'error') {
-          evtSource.close();
-          item.state = 'failed';
-          item.evtSource = null;
-          renderQueue();
-        }
-      };
+        };
 
-      evtSource.onerror = () => {
-        evtSource.close();
-        item.state = 'failed';
-        item.evtSource = null;
+        item.state = 'downloading';
+        item.selected = false;
         renderQueue();
-      };
+
+        const encodedUrl = encodeURIComponent(item.url);
+        const evtSource = new EventSource(`/api/download?url=${encodedUrl}&quality=${selectedQuality}`);
+        item.evtSource = evtSource;
+
+        evtSource.onmessage = (e) => {
+          const msg = JSON.parse(e.data);
+
+          if (msg.type === 'jobId') {
+            item.jobId = msg.jobId;
+          } else if (msg.type === 'progress') {
+            const fill = document.getElementById(`fill-${i}`);
+            const track = document.getElementById(`track-${i}`);
+            const statusEl = document.getElementById(`status-${i}`);
+            if (fill) { track.style.display = 'block'; fill.style.width = msg.percent + '%'; }
+            if (statusEl) statusEl.innerHTML = `<span style="color:var(--muted);font-family:var(--mono);font-size:10px">${msg.percent.toFixed(0)}%</span>`;
+          } else if (msg.type === 'done') {
+            evtSource.close();
+            item.state = 'done';
+            item.token = msg.token;
+            item.evtSource = null;
+            item._cancel = null;
+            renderQueue();
+            updateBatchActionBar();
+            finish(msg.token);
+          } else if (msg.type === 'error') {
+            evtSource.close();
+            item.state = 'failed';
+            item.evtSource = null;
+            item._cancel = null;
+            renderQueue();
+            finish(null);
+          }
+        };
+
+        evtSource.onerror = () => {
+          evtSource.close();
+          if (item.state === 'downloading') {
+            item.state = 'failed';
+            item.evtSource = null;
+            item._cancel = null;
+            renderQueue();
+            finish(null);
+          }
+        };
+      });
     }
 
-    // ── Batch download selected ────────────────────────────────────────────────
-    dlSelectedBtn.addEventListener('click', () => {
+    // ── Download selected as ZIP ───────────────────────────────────────────────
+    dlZipBtn.addEventListener('click', async () => {
       const targets = queue.map((item, i) => ({ item, i })).filter(({ item }) => item.selected && item.state === 'idle');
-      targets.forEach(({ i }) => startItemDownload(i));
-    });
+      if (targets.length === 0) return;
 
-    // ── Download all as ZIP ────────────────────────────────────────────────────
-    dlAllBtn.addEventListener('click', async () => {
-      const doneItems = queue.filter(i => i.state === 'done' && i.token);
-      if (doneItems.length === 0) return;
+      dlZipBtn.disabled = true;
+      dlZipLabel.textContent = '⏳ Downloading...';
 
-      dlAllBtn.disabled = true;
-      dlAllBtn.querySelector('span').textContent = '⏳ Building ZIP...';
+      const tokens = await Promise.all(targets.map(({ i }) => startItemDownload(i)));
+      const validTokens = tokens.filter(Boolean);
+
+      if (validTokens.length === 0) {
+        showStatus('All downloads failed.', 'error');
+        updateBatchActionBar();
+        return;
+      }
+
+      dlZipLabel.textContent = '⏳ Building ZIP...';
 
       try {
         const res = await fetch('/api/zip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tokens: doneItems.map(i => i.token) }),
+          body: JSON.stringify({ tokens: validTokens }),
         });
 
         if (!res.ok) {
           showStatus('Failed to build ZIP.', 'error');
-          return;
+        } else {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'ytdl-batch.zip';
+          a.click();
+          URL.revokeObjectURL(url);
+          showStatus('ZIP download started.', 'success');
+          queue.forEach(item => { if (item.token && validTokens.includes(item.token)) item.token = null; });
+          renderQueue();
         }
-
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'ytdl-batch.zip';
-        a.click();
-        URL.revokeObjectURL(url);
-
-        // Mark tokens as consumed
-        doneItems.forEach(item => { item.token = null; item.state = 'idle'; });
-        renderQueue();
-        showStatus('ZIP download started.', 'success');
       } catch {
         showStatus('Network error building ZIP.', 'error');
-      } finally {
-        dlAllBtn.disabled = false;
-        dlAllBtn.querySelector('span').textContent = '⬇ Download All as ZIP';
       }
+
+      updateBatchActionBar();
     });
 
     // ── Single file token download ─────────────────────────────────────────────

@@ -201,6 +201,7 @@ app.get('/api/download', async (req, res) => {
 
   const jobId = crypto.randomBytes(8).toString('hex');
   const outputTemplate = path.join(DOWNLOAD_DIR, `%(title)s - %(uploader)s.${jobId}.%(ext)s`);
+  const isAudio = quality === 'mp3';
   const formatArg = FORMAT_MAP[quality] || DEFAULT_FORMAT;
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -208,24 +209,21 @@ app.get('/api/download', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const args = [
-    '--no-playlist', '-f', formatArg,
-    '--merge-output-format', 'mp4',
-    '--newline', '-o', outputTemplate,
-    decodedUrl,
-  ];
+  const args = isAudio
+    ? ['--no-playlist', '--extract-audio', '--audio-format', 'mp3', '--newline', '-o', outputTemplate, decodedUrl]
+    : ['--no-playlist', '-f', formatArg, '--merge-output-format', 'mp4', '--newline', '-o', outputTemplate, decodedUrl];
 
   const ytdlp = spawn('yt-dlp', args);
   app.locals.jobs[jobId] = ytdlp;
 
   let finalFilename = null;
+  let downloadComplete = false;
 
-  // Priority-ordered filename detection: [Merger] wins over [download] Destination
-  // because it represents the true merged output path.
   const filenamePatterns = [
-    { re: /\[download\] Destination: (.+\.mp4)/, priority: 1 },
+    { re: /\[download\] Destination: (.+)/, priority: 1 },
     { re: /\[download\] (.+) has already been downloaded/, priority: 1 },
     { re: /\[Merger\] Merging formats into "(.+)"/, priority: 2 },
+    { re: /\[ExtractAudio\] Destination: (.+)/, priority: 2 },
   ];
 
   sseWrite(res, { type: 'jobId', jobId });
@@ -247,7 +245,7 @@ app.get('/api/download', async (req, res) => {
       for (const { re, priority } of filenamePatterns) {
         const m = line.match(re);
         if (m && priority >= bestPriority) {
-          finalFilename = m[1];
+          finalFilename = m[1].trim();
           bestPriority = priority;
         }
       }
@@ -279,9 +277,9 @@ app.get('/api/download', async (req, res) => {
     app.locals.tokens[downloadToken] = {
       path: finalFilename,
       name: path.basename(finalFilename).replace(`.${jobId}`, ''),
+      contentType: isAudio ? 'audio/mpeg' : 'video/mp4',
     };
 
-    // Token and file expire together after 5 min so unredeemed files don't linger
     setTimeout(async () => {
       const td = app.locals.tokens[downloadToken];
       if (td) {
@@ -290,18 +288,20 @@ app.get('/api/download', async (req, res) => {
       }
     }, 5 * 60 * 1000);
 
+    downloadComplete = true;
     sseWrite(res, { type: 'done', token: downloadToken });
     res.end();
   });
 
-  // Client disconnect: kill process and clean up any partial files
   req.on('close', async () => {
     if (app.locals.jobs[jobId]) {
       ytdlp.kill();
       delete app.locals.jobs[jobId];
     }
-    const partials = fs.readdirSync(DOWNLOAD_DIR).filter((f) => f.includes(jobId));
-    await cleanupFiles(partials.map((f) => path.join(DOWNLOAD_DIR, f)));
+    if (!downloadComplete) {
+      const partials = fs.readdirSync(DOWNLOAD_DIR).filter((f) => f.includes(jobId));
+      await cleanupFiles(partials.map((f) => path.join(DOWNLOAD_DIR, f)));
+    }
   });
 });
 
@@ -331,7 +331,7 @@ app.get('/api/file/:token', (req, res) => {
 
   const filename = sanitizeFilename(tokenData.name);
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.setHeader('Content-Type', 'video/mp4');
+  res.setHeader('Content-Type', tokenData.contentType || 'video/mp4');
 
   res.sendFile(tokenData.path, async (err) => {
     if (!err) {
