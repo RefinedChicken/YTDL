@@ -1,7 +1,8 @@
 const express = require('express');
-const { exec, spawn } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const fsp = require('fs').promises;
 const crypto = require('crypto');
 const archiver = require('archiver');
 
@@ -13,25 +14,35 @@ if (!fs.existsSync(DOWNLOAD_DIR)) {
   fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 }
 
+// Initialize shared state once at startup
+app.locals.jobs = {};
+app.locals.tokens = {};
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-function cleanupOldFiles() {
-  const files = fs.readdirSync(DOWNLOAD_DIR);
-  const now = Date.now();
-  files.forEach(file => {
-    const filePath = path.join(DOWNLOAD_DIR, file);
-    const stats = fs.statSync(filePath);
-    if (now - stats.mtimeMs > 10 * 60 * 1000) {
-      fs.unlinkSync(filePath);
-    }
-  });
+async function cleanupOldFiles() {
+  try {
+    const files = await fsp.readdir(DOWNLOAD_DIR);
+    const now = Date.now();
+    await Promise.all(
+      files.map(async (file) => {
+        const filePath = path.join(DOWNLOAD_DIR, file);
+        const stats = await fsp.stat(filePath);
+        if (now - stats.mtimeMs > 10 * 60 * 1000) {
+          await fsp.unlink(filePath).catch(() => {});
+        }
+      })
+    );
+  } catch (err) {
+    console.warn('Cleanup error:', err.message);
+  }
 }
 
 function isValidYouTubeUrl(url) {
-  return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|playlist\?)|youtu\.be\/)[\w\-?=&]+/.test(url);
+  return /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=[\w-]{11}|shorts\/[\w-]{11}|playlist\?list=[\w-]+)|youtu\.be\/[\w-]{11})([?&].+)?$/.test(url);
 }
 
 function isPlaylistUrl(url) {
@@ -50,19 +61,56 @@ function formatDuration(seconds) {
 }
 
 function sanitizeFilename(name) {
-  return name.replace(/[^\x20-\x7E]/g, '').replace(/[:"*?<>|\/\\]/g, '').trim();
+  return name.replace(/[^\x20-\x7E]/g, '').replace(/[:"*?<>|\/\\]/g, '').trim() || 'download';
 }
 
-// ── Single video info ─────────────────────────────────────────────────────────
+function sseWrite(res, data) {
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
 
+function zipTimestamp() {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  const suffix = crypto.randomBytes(2).toString('hex');
+  return `ytdl-${date}_${suffix}.zip`;
+}
+
+async function cleanupFiles(filePaths) {
+  await Promise.all(
+    filePaths.map((p) => fsp.unlink(p).catch(() => {}))
+  );
+}
+
+// ─── Format map ─────────────────────────────────────────────────────────────
+
+const FORMAT_MAP = {
+  '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+  '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]',
+  '480p':  'bestvideo[height<=480]+bestaudio/best[height<=480]',
+};
+const DEFAULT_FORMAT = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+
+// ─── Routes ─────────────────────────────────────────────────────────────────
+
+// Single video info
 app.post('/api/info', (req, res) => {
   const { url } = req.body;
   if (!url || !isValidYouTubeUrl(url)) {
     return res.status(400).json({ error: 'Invalid YouTube URL' });
   }
 
-  exec(`yt-dlp --dump-json --no-playlist "${url}"`, { timeout: 30000 }, (err, stdout) => {
-    if (err) return res.status(500).json({ error: 'Could not fetch video info. Make sure the video is public.' });
+  const ytdlp = spawn('yt-dlp', ['--dump-json', '--no-playlist', url]);
+  let stdout = '';
+  let stderr = '';
+
+  ytdlp.stdout.on('data', (d) => { stdout += d; });
+  ytdlp.stderr.on('data', (d) => { stderr += d; });
+
+  ytdlp.on('close', (code) => {
+    if (code !== 0) {
+      console.error('yt-dlp info error:', stderr);
+      return res.status(500).json({ error: 'Could not fetch video info. Make sure the video is public.' });
+    }
     try {
       const info = JSON.parse(stdout);
       res.json({
@@ -75,35 +123,39 @@ app.post('/api/info', (req, res) => {
       res.status(500).json({ error: 'Failed to parse video info' });
     }
   });
+
+  setTimeout(() => ytdlp.kill(), 30000);
 });
 
-// ── Playlist / batch info ─────────────────────────────────────────────────────
-
+// Playlist / batch info
 app.post('/api/info/batch', (req, res) => {
-  const { urls } = req.body; // array of URLs
+  const { urls } = req.body;
   if (!Array.isArray(urls) || urls.length === 0) {
     return res.status(400).json({ error: 'No URLs provided' });
   }
 
-  const invalid = urls.filter(u => !isValidYouTubeUrl(u));
+  const invalid = urls.filter((u) => !isValidYouTubeUrl(u));
   if (invalid.length > 0) {
     return res.status(400).json({ error: `Invalid URL(s): ${invalid.join(', ')}` });
   }
 
-  // Fetch info for all URLs in parallel; each may expand into multiple entries (playlists)
-  const tasks = urls.map(url => new Promise((resolve) => {
-    // --flat-playlist dumps one JSON object per entry without downloading
-    const flags = isPlaylistUrl(url)
-      ? `--flat-playlist --dump-json "${url}"`
-      : `--dump-json --no-playlist "${url}"`;
+  const tasks = urls.map((url) => new Promise((resolve) => {
+    const args = isPlaylistUrl(url)
+      ? ['--flat-playlist', '--dump-json', url]
+      : ['--dump-json', '--no-playlist', url];
 
-    exec(`yt-dlp ${flags}`, { timeout: 60000 }, (err, stdout) => {
-      if (err) {
+    const ytdlp = spawn('yt-dlp', args);
+    let stdout = '';
+
+    ytdlp.stdout.on('data', (d) => { stdout += d; });
+    ytdlp.stderr.on('data', () => {});
+
+    ytdlp.on('close', (code) => {
+      if (code !== 0) {
         resolve({ error: true, url });
         return;
       }
-      // stdout may be multiple JSON objects (one per line) for playlists
-      const entries = stdout.trim().split('\n').map(line => {
+      const entries = stdout.trim().split('\n').map((line) => {
         try {
           const info = JSON.parse(line);
           return {
@@ -121,9 +173,11 @@ app.post('/api/info/batch', (req, res) => {
 
       resolve({ error: false, entries });
     });
+
+    setTimeout(() => ytdlp.kill(), 60000);
   }));
 
-  Promise.all(tasks).then(results => {
+  Promise.all(tasks).then((results) => {
     const videos = [];
     const errors = [];
     results.forEach((r, i) => {
@@ -134,32 +188,25 @@ app.post('/api/info/batch', (req, res) => {
   });
 });
 
-// ── Download a single video (SSE) ─────────────────────────────────────────────
-
-app.get('/api/download', (req, res) => {
+// Download a single video (SSE)
+app.get('/api/download', async (req, res) => {
   const { url, quality } = req.query;
-  if (!url || !isValidYouTubeUrl(decodeURIComponent(url))) {
+  const decodedUrl = url ? decodeURIComponent(url) : '';
+
+  if (!decodedUrl || !isValidYouTubeUrl(decodedUrl)) {
     return res.status(400).json({ error: 'Invalid YouTube URL' });
   }
 
-  cleanupOldFiles();
+  await cleanupOldFiles();
 
-  const decodedUrl = decodeURIComponent(url);
   const jobId = crypto.randomBytes(8).toString('hex');
   const outputTemplate = path.join(DOWNLOAD_DIR, `%(title)s - %(uploader)s.${jobId}.%(ext)s`);
+  const formatArg = FORMAT_MAP[quality] || DEFAULT_FORMAT;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
-
-  const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
-
-  let formatArg;
-  if (quality === '1080p')     formatArg = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]';
-  else if (quality === '720p') formatArg = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]';
-  else if (quality === '480p') formatArg = 'bestvideo[height<=480]+bestaudio/best[height<=480]';
-  else                         formatArg = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
 
   const args = [
     '--no-playlist', '-f', formatArg,
@@ -169,130 +216,163 @@ app.get('/api/download', (req, res) => {
   ];
 
   const ytdlp = spawn('yt-dlp', args);
+  app.locals.jobs[jobId] = ytdlp;
+
   let finalFilename = null;
 
-  app.locals.jobs = app.locals.jobs || {};
-  app.locals.jobs[jobId] = ytdlp;
-  send({ type: 'jobId', jobId });
+  // Priority-ordered filename detection: [Merger] wins over [download] Destination
+  // because it represents the true merged output path.
+  const filenamePatterns = [
+    { re: /\[download\] Destination: (.+\.mp4)/, priority: 1 },
+    { re: /\[download\] (.+) has already been downloaded/, priority: 1 },
+    { re: /\[Merger\] Merging formats into "(.+)"/, priority: 2 },
+  ];
+
+  sseWrite(res, { type: 'jobId', jobId });
 
   ytdlp.stdout.on('data', (data) => {
-    data.toString().split('\n').forEach(line => {
+    data.toString().split('\n').forEach((line) => {
       const progressMatch = line.match(/\[download\]\s+([\d.]+)%\s+of\s+~?([\d.]+\w+)\s+at\s+([\d.]+\w+\/s)/);
-      if (progressMatch) send({ type: 'progress', percent: parseFloat(progressMatch[1]), size: progressMatch[2], speed: progressMatch[3] });
+      if (progressMatch) {
+        sseWrite(res, {
+          type: 'progress',
+          percent: parseFloat(progressMatch[1]),
+          size: progressMatch[2],
+          speed: progressMatch[3],
+        });
+        return;
+      }
 
-      const destMatch = line.match(/\[Merger\] Merging formats into "(.+)"/);
-      if (destMatch) finalFilename = destMatch[1];
-
-      const dlMatch = line.match(/\[download\] Destination: (.+\.mp4)/);
-      if (dlMatch) finalFilename = dlMatch[1];
-
-      const alreadyMatch = line.match(/\[download\] (.+) has already been downloaded/);
-      if (alreadyMatch) finalFilename = alreadyMatch[1];
+      let bestPriority = 0;
+      for (const { re, priority } of filenamePatterns) {
+        const m = line.match(re);
+        if (m && priority >= bestPriority) {
+          finalFilename = m[1];
+          bestPriority = priority;
+        }
+      }
     });
   });
 
-  ytdlp.stderr.on('data', (data) => console.error('yt-dlp stderr:', data.toString()));
+  ytdlp.stderr.on('data', (d) => console.error('yt-dlp stderr:', d.toString()));
 
-  ytdlp.on('close', (code) => {
-    delete (app.locals.jobs || {})[jobId];
+  ytdlp.on('close', async (code) => {
+    delete app.locals.jobs[jobId];
+
     if (code !== 0) {
-      send({ type: 'error', message: 'Download failed. The video may be unavailable or restricted.' });
+      sseWrite(res, { type: 'error', message: 'Download failed. The video may be unavailable or restricted.' });
       return res.end();
     }
 
-    if (!finalFilename) {
-      const files = fs.readdirSync(DOWNLOAD_DIR).filter(f => f.includes(jobId));
+    // Fallback: scan for file by jobId if pattern matching missed it
+    if (!finalFilename || !fs.existsSync(finalFilename)) {
+      const files = fs.readdirSync(DOWNLOAD_DIR).filter((f) => f.includes(jobId));
       if (files.length > 0) finalFilename = path.join(DOWNLOAD_DIR, files[0]);
     }
 
     if (!finalFilename || !fs.existsSync(finalFilename)) {
-      send({ type: 'error', message: 'Output file not found after download.' });
+      sseWrite(res, { type: 'error', message: 'Output file not found after download.' });
       return res.end();
     }
 
     const downloadToken = crypto.randomBytes(16).toString('hex');
-    app.locals.tokens = app.locals.tokens || {};
     app.locals.tokens[downloadToken] = {
       path: finalFilename,
       name: path.basename(finalFilename).replace(`.${jobId}`, ''),
     };
-    setTimeout(() => { delete app.locals.tokens[downloadToken]; }, 5 * 60 * 1000);
 
-    send({ type: 'done', token: downloadToken });
+    // Token and file expire together after 5 min so unredeemed files don't linger
+    setTimeout(async () => {
+      const td = app.locals.tokens[downloadToken];
+      if (td) {
+        await fsp.unlink(td.path).catch(() => {});
+        delete app.locals.tokens[downloadToken];
+      }
+    }, 5 * 60 * 1000);
+
+    sseWrite(res, { type: 'done', token: downloadToken });
     res.end();
   });
 
-  req.on('close', () => ytdlp.kill());
+  // Client disconnect: kill process and clean up any partial files
+  req.on('close', async () => {
+    if (app.locals.jobs[jobId]) {
+      ytdlp.kill();
+      delete app.locals.jobs[jobId];
+    }
+    const partials = fs.readdirSync(DOWNLOAD_DIR).filter((f) => f.includes(jobId));
+    await cleanupFiles(partials.map((f) => path.join(DOWNLOAD_DIR, f)));
+  });
 });
 
-// ── Cancel a download ─────────────────────────────────────────────────────────
-
-app.delete('/api/download/:jobId', (req, res) => {
+// Cancel a download
+app.delete('/api/download/:jobId', async (req, res) => {
   const { jobId } = req.params;
-  const jobs = app.locals.jobs || {};
-  const job = jobs[jobId];
+  const job = app.locals.jobs[jobId];
 
   if (!job) return res.status(404).json({ error: 'Job not found or already complete' });
 
   job.kill('SIGTERM');
-  delete jobs[jobId];
+  delete app.locals.jobs[jobId];
 
-  try {
-    fs.readdirSync(DOWNLOAD_DIR)
-      .filter(f => f.includes(jobId))
-      .forEach(f => fs.unlinkSync(path.join(DOWNLOAD_DIR, f)));
-  } catch (e) {
-    console.warn('Cleanup after cancel failed:', e.message);
-  }
+  const partials = fs.readdirSync(DOWNLOAD_DIR).filter((f) => f.includes(jobId));
+  await cleanupFiles(partials.map((f) => path.join(DOWNLOAD_DIR, f)));
 
   res.json({ success: true });
 });
 
-// ── Serve a single file via token ─────────────────────────────────────────────
-
+// Serve a single file via token
 app.get('/api/file/:token', (req, res) => {
-  const tokens = app.locals.tokens || {};
-  const tokenData = tokens[req.params.token];
-  const filePath = tokenData?.path;
+  const tokenData = app.locals.tokens[req.params.token];
 
-  if (!filePath || !fs.existsSync(filePath)) {
+  if (!tokenData || !fs.existsSync(tokenData.path)) {
     return res.status(404).json({ error: 'File not found or expired' });
   }
 
   const filename = sanitizeFilename(tokenData.name);
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.setHeader('Content-Type', 'video/mp4');
-  res.sendFile(filePath, (err) => {
+
+  res.sendFile(tokenData.path, async (err) => {
     if (!err) {
-      setTimeout(() => {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        delete tokens[req.params.token];
+      setTimeout(async () => {
+        await fsp.unlink(tokenData.path).catch(() => {});
+        delete app.locals.tokens[req.params.token];
       }, 5000);
     }
   });
 });
 
-// ── Zip and serve multiple files by token list ────────────────────────────────
-
+// Zip and serve multiple files by token list
 app.post('/api/zip', (req, res) => {
   const { tokens: tokenList } = req.body;
   if (!Array.isArray(tokenList) || tokenList.length === 0) {
     return res.status(400).json({ error: 'No tokens provided' });
   }
 
-  const tokenStore = app.locals.tokens || {};
+  const tokenStore = app.locals.tokens;
+
+  // Snapshot and immediately invalidate tokens to prevent concurrent double-download races
   const files = tokenList
-    .map(t => tokenStore[t])
-    .filter(t => t && fs.existsSync(t.path));
+    .map((t) => {
+      const td = tokenStore[t];
+      if (td && fs.existsSync(td.path)) {
+        delete tokenStore[t];
+        return td;
+      }
+      return null;
+    })
+    .filter(Boolean);
 
   if (files.length === 0) {
     return res.status(404).json({ error: 'No valid files found for provided tokens' });
   }
 
-  res.setHeader('Content-Disposition', 'attachment; filename="ytdl-batch.zip"');
+  const zipName = zipTimestamp();
+  res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
   res.setHeader('Content-Type', 'application/zip');
 
-  const archive = archiver('zip', { zlib: { level: 0 } }); // level 0 = store only (videos don't compress)
+  const archive = archiver('zip', { zlib: { level: 0 } }); // store only — videos don't compress
   archive.pipe(res);
 
   files.forEach(({ path: filePath, name }) => {
@@ -306,28 +386,29 @@ app.post('/api/zip', (req, res) => {
     if (!res.headersSent) res.status(500).json({ error: 'Failed to create zip' });
   });
 
-  // Clean up files after zip is sent
-  archive.on('finish', () => {
-    setTimeout(() => {
-      tokenList.forEach(t => {
-        const td = tokenStore[t];
-        if (td && fs.existsSync(td.path)) fs.unlinkSync(td.path);
-        delete tokenStore[t];
-      });
+  archive.on('finish', async () => {
+    setTimeout(async () => {
+      await cleanupFiles(files.map((f) => f.path));
     }, 5000);
   });
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────────
+// ─── Start ───────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
   console.log(`\n🎬 YouTube Downloader running at http://localhost:${PORT}\n`);
-  exec('yt-dlp --version', (err, stdout) => {
-    if (err) console.warn('⚠️  yt-dlp not found! Install it with pipx: pipx install yt-dlp');
-    else console.log(`✅ yt-dlp version: ${stdout.trim()}`);
+
+  const versionCheck = spawn('yt-dlp', ['--version']);
+  let version = '';
+  versionCheck.stdout.on('data', (d) => { version += d; });
+  versionCheck.on('close', (code) => {
+    if (code !== 0) console.warn('⚠️  yt-dlp not found! Install it: https://github.com/yt-dlp/yt-dlp#installation');
+    else console.log(`✅ yt-dlp version: ${version.trim()}`);
   });
-  exec('ffmpeg -version', (err) => {
-    if (err) console.warn('⚠️  ffmpeg not found! Install it for best quality merging.');
+
+  const ffmpegCheck = spawn('ffmpeg', ['-version']);
+  ffmpegCheck.on('close', (code) => {
+    if (code !== 0) console.warn('⚠️  ffmpeg not found! Install it for best quality merging.');
     else console.log('✅ ffmpeg detected');
   });
 });
