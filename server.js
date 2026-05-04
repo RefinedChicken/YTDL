@@ -343,8 +343,8 @@ app.get('/api/file/:token', (req, res) => {
   });
 });
 
-// Zip and serve multiple files by token list
-app.post('/api/zip', (req, res) => {
+// Zip multiple files by token list, write to disk, return a download token
+app.post('/api/zip', async (req, res) => {
   const { tokens: tokenList } = req.body;
   if (!Array.isArray(tokenList) || tokenList.length === 0) {
     return res.status(400).json({ error: 'No tokens provided' });
@@ -352,7 +352,6 @@ app.post('/api/zip', (req, res) => {
 
   const tokenStore = app.locals.tokens;
 
-  // Snapshot and immediately invalidate tokens to prevent concurrent double-download races
   const files = tokenList
     .map((t) => {
       const td = tokenStore[t];
@@ -369,28 +368,42 @@ app.post('/api/zip', (req, res) => {
   }
 
   const zipName = zipTimestamp();
-  res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
-  res.setHeader('Content-Type', 'application/zip');
-
-  const archive = archiver('zip', { zlib: { level: 0 } }); // store only — videos don't compress
-  archive.pipe(res);
-
-  files.forEach(({ path: filePath, name }) => {
-    archive.file(filePath, { name: sanitizeFilename(name) });
-  });
-
-  archive.finalize();
+  const zipPath = path.join(DOWNLOAD_DIR, zipName);
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver('zip', { zlib: { level: 0 } });
 
   archive.on('error', (err) => {
     console.error('Archiver error:', err);
+    fsp.unlink(zipPath).catch(() => {});
     if (!res.headersSent) res.status(500).json({ error: 'Failed to create zip' });
   });
 
-  archive.on('finish', async () => {
+  output.on('close', async () => {
+    await cleanupFiles(files.map((f) => f.path));
+
+    const zipToken = crypto.randomBytes(16).toString('hex');
+    app.locals.tokens[zipToken] = {
+      path: zipPath,
+      name: zipName,
+      contentType: 'application/zip',
+    };
+
     setTimeout(async () => {
-      await cleanupFiles(files.map((f) => f.path));
-    }, 5000);
+      const td = app.locals.tokens[zipToken];
+      if (td) {
+        await fsp.unlink(td.path).catch(() => {});
+        delete app.locals.tokens[zipToken];
+      }
+    }, 5 * 60 * 1000);
+
+    res.json({ token: zipToken });
   });
+
+  archive.pipe(output);
+  files.forEach(({ path: filePath, name }) => {
+    archive.file(filePath, { name: sanitizeFilename(name) });
+  });
+  archive.finalize();
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────
