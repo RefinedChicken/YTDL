@@ -5,13 +5,22 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build:bundle": "node scripts/bundle.js",
+    "build:sea": "node --experimental-sea-config sea-config.json",
+    "build:icons": "node scripts/generate-icons.js",
+    "build": "npm run build:bundle && npm run build:sea"
   },
   "dependencies": {
     "archiver": "^5.3.2",
     "express": "^4.18.2"
   },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "postject": "^1.0.0-alpha.6",
+    "sharp": "^0.33.0"
+  },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

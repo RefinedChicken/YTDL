@@ -1,0 +1,14 @@
+node_modules/
+downloads/
+dist/
+
+# Tauri build output and generated assets
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/icons/*.png
+src-tauri/icons/*.ico
+src-tauri/icons/*.icns
+src-tauri/gen/
+
+# Generated during CI — do not commit
+src-tauri/WixTools/

@@ -1,0 +1,23 @@
+[package]
+name = "ytdl"
+version = "1.0.0"
+edition = "2021"
+description = "YTDL — YouTube downloader tray app"
+default-run = "ytdl"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

@@ -1,0 +1,194 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ytdlp-asset: yt-dlp
+            ffmpeg-pkg: ffmpeg
+            binary-ext: ''
+            sea-extra-flags: ''
+
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ytdlp-asset: yt-dlp_macos
+            ffmpeg-pkg: ffmpeg
+            binary-ext: ''
+            sea-extra-flags: '--macho-segment-name NODE_SEA'
+
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ytdlp-asset: yt-dlp.exe
+            ffmpeg-pkg: ffmpeg
+            binary-ext: '.exe'
+            sea-extra-flags: ''
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Node ──────────────────────────────────────────────────────────────────
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm install
+
+      # ── Rust ──────────────────────────────────────────────────────────────────
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # ── Linux system deps ─────────────────────────────────────────────────────
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            ffmpeg
+
+      # ── macOS system deps ─────────────────────────────────────────────────────
+      - name: Install macOS system dependencies
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      # ── Windows system deps ───────────────────────────────────────────────────
+      - name: Install Windows system dependencies
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg --no-progress -y
+
+      # ── Icons ─────────────────────────────────────────────────────────────────
+      - name: Generate app icon
+        run: node scripts/generate-icons.js
+
+      - name: Generate all icon sizes
+        run: npx @tauri-apps/cli@latest icon src-tauri/icons/icon.png
+
+      # ── Node SEA binary ───────────────────────────────────────────────────────
+      - name: Bundle server.js
+        run: node scripts/bundle.js
+
+      - name: Generate SEA blob
+        run: node --experimental-sea-config sea-config.json
+
+      - name: Create SEA binary (Linux / macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          NODE_BIN=$(which node)
+
+          # macOS: strip existing codesign before injection
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            codesign --remove-signature "$NODE_BIN"
+          fi
+
+          cp "$NODE_BIN" src-tauri/binaries/ytdl-server-${{ matrix.target }}
+          npx postject \
+            src-tauri/binaries/ytdl-server-${{ matrix.target }} \
+            NODE_SEA_BLOB dist/sea-prep.blob \
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 \
+            ${{ matrix.sea-extra-flags }}
+
+          # Re-sign on macOS (ad-hoc — no cert required, bypasses Gatekeeper local check)
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            codesign --sign - src-tauri/binaries/ytdl-server-${{ matrix.target }}
+          fi
+
+          chmod +x src-tauri/binaries/ytdl-server-${{ matrix.target }}
+
+      - name: Create SEA binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/binaries | Out-Null
+          $nodePath = (Get-Command node).Source
+          Copy-Item $nodePath "src-tauri/binaries/ytdl-server-${{ matrix.target }}.exe"
+          npx postject `
+            "src-tauri/binaries/ytdl-server-${{ matrix.target }}.exe" `
+            NODE_SEA_BLOB dist/sea-prep.blob `
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+
+      # ── yt-dlp sidecar ────────────────────────────────────────────────────────
+      - name: Download yt-dlp (Linux / macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          curl -L \
+            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${{ matrix.ytdlp-asset }}" \
+            -o "src-tauri/binaries/yt-dlp-${{ matrix.target }}"
+          chmod +x "src-tauri/binaries/yt-dlp-${{ matrix.target }}"
+
+      - name: Download yt-dlp (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${{ matrix.ytdlp-asset }}" `
+            -OutFile "src-tauri/binaries/yt-dlp-${{ matrix.target }}.exe"
+
+      # ── ffmpeg sidecar ────────────────────────────────────────────────────────
+      - name: Copy ffmpeg sidecar (Linux / macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cp "$(which ffmpeg)" "src-tauri/binaries/ffmpeg-${{ matrix.target }}"
+          chmod +x "src-tauri/binaries/ffmpeg-${{ matrix.target }}"
+
+      - name: Copy ffmpeg sidecar (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ffmpeg = (Get-Command ffmpeg).Source
+          Copy-Item $ffmpeg "src-tauri/binaries/ffmpeg-${{ matrix.target }}.exe"
+
+      # ── Tauri build ───────────────────────────────────────────────────────────
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'YTDL ${{ github.ref_name }}'
+          releaseBody: |
+            ## Installation
+
+            | Platform | File |
+            |----------|------|
+            | macOS (Apple Silicon) | `.dmg` |
+            | Windows | `_x64-setup.exe` (installer) |
+            | Linux | `.AppImage` |
+
+            **macOS:** Right-click → Open if Gatekeeper warns "unidentified developer".
+            **Windows:** Click "More info → Run anyway" on the SmartScreen prompt.
+
+            App runs as a background tray agent. Left-click the tray icon to open the web UI in your browser.
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}

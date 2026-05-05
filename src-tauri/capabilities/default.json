@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capability set (no frontend windows — all APIs called from Rust)",
+  "local": true,
+  "windows": [],
+  "permissions": []
+}

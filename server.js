@@ -4,11 +4,18 @@ const path = require('path');
 const fs = require('fs');
 const fsp = require('fs').promises;
 const crypto = require('crypto');
+const os = require('os');
 const archiver = require('archiver');
 
 const app = express();
-const PORT = 80;
-const DOWNLOAD_DIR = path.join(__dirname, 'downloads');
+
+// When bundled via Tauri, these are injected as env vars from the Rust wrapper.
+// Falls back to dev defaults so plain `node server.js` still works.
+const PORT        = parseInt(process.env.YTDL_PORT         || '80',  10);
+const YTDLP_BIN   = process.env.YTDLP_PATH                 || 'yt-dlp';
+const FFMPEG_BIN  = process.env.FFMPEG_PATH                || 'ffmpeg';
+const PUBLIC_DIR  = process.env.YTDL_PUBLIC_DIR            || path.join(__dirname, 'public');
+const DOWNLOAD_DIR = process.env.YTDL_DOWNLOAD_DIR         || path.join(__dirname, 'downloads');
 
 if (!fs.existsSync(DOWNLOAD_DIR)) {
   fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
@@ -19,7 +26,7 @@ app.locals.jobs = {};
 app.locals.tokens = {};
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(PUBLIC_DIR));
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -99,7 +106,7 @@ app.post('/api/info', (req, res) => {
     return res.status(400).json({ error: 'Invalid YouTube URL' });
   }
 
-  const ytdlp = spawn('yt-dlp', ['--dump-json', '--no-playlist', url]);
+  const ytdlp = spawn(YTDLP_BIN, ['--dump-json', '--no-playlist', url]);
   let stdout = '';
   let stderr = '';
 
@@ -144,7 +151,7 @@ app.post('/api/info/batch', (req, res) => {
       ? ['--flat-playlist', '--dump-json', url]
       : ['--dump-json', '--no-playlist', url];
 
-    const ytdlp = spawn('yt-dlp', args);
+    const ytdlp = spawn(YTDLP_BIN, args);
     let stdout = '';
 
     ytdlp.stdout.on('data', (d) => { stdout += d; });
@@ -210,10 +217,10 @@ app.get('/api/download', async (req, res) => {
   res.flushHeaders();
 
   const args = isAudio
-    ? ['--no-playlist', '--extract-audio', '--audio-format', 'mp3', '--newline', '-o', outputTemplate, decodedUrl]
-    : ['--no-playlist', '-f', formatArg, '--merge-output-format', 'mp4', '--newline', '-o', outputTemplate, decodedUrl];
+    ? ['--no-playlist', '--extract-audio', '--audio-format', 'mp3', '--ffmpeg-location', FFMPEG_BIN, '--newline', '-o', outputTemplate, decodedUrl]
+    : ['--no-playlist', '-f', formatArg, '--merge-output-format', 'mp4', '--ffmpeg-location', FFMPEG_BIN, '--newline', '-o', outputTemplate, decodedUrl];
 
-  const ytdlp = spawn('yt-dlp', args);
+  const ytdlp = spawn(YTDLP_BIN, args);
   app.locals.jobs[jobId] = ytdlp;
 
   let finalFilename = null;
@@ -411,7 +418,7 @@ app.post('/api/zip', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n🎬 YouTube Downloader running at http://localhost:${PORT}\n`);
 
-  const versionCheck = spawn('yt-dlp', ['--version']);
+  const versionCheck = spawn(YTDLP_BIN, ['--version']);
   let version = '';
   versionCheck.stdout.on('data', (d) => { version += d; });
   versionCheck.on('close', (code) => {
@@ -419,7 +426,7 @@ app.listen(PORT, () => {
     else console.log(`✅ yt-dlp version: ${version.trim()}`);
   });
 
-  const ffmpegCheck = spawn('ffmpeg', ['-version']);
+  const ffmpegCheck = spawn(FFMPEG_BIN, ['-version']);
   ffmpegCheck.on('close', (code) => {
     if (code !== 0) console.warn('⚠️  ffmpeg not found! Install it for best quality merging.');
     else console.log('✅ ffmpeg detected');
