@@ -1,4 +1,5 @@
 > ⚠️ **Work in progress:** YTDL is actively being developed. Features may change and bugs may occur.
+> Current releases are known to be broken.
 
 # YTDL: A sleek WebUI for yt-dlp
 
