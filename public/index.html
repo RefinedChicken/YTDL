@@ -732,9 +732,9 @@
       <div class="queue-header">
         <span class="queue-title">Queue — <span id="queue-count">0</span> video(s)</span>
         <div class="queue-actions">
-          <button class="text-btn" id="select-all-btn">Select All</button>
-          <button class="text-btn" id="deselect-all-btn">Deselect All</button>
-          <button class="text-btn danger" id="clear-queue-btn">Clear</button>
+          <button class="text-btn" id="select-all-btn">Select All<span class="kbd">[a]</span></button>
+          <button class="text-btn" id="deselect-all-btn">Deselect All<span class="kbd">[d]</span></button>
+          <button class="text-btn danger" id="clear-queue-btn">Clear<span class="kbd">[c]</span></button>
         </div>
       </div>
       <div class="queue-list" id="queue-list"></div>
@@ -761,10 +761,11 @@
     <div class="shortcut-row"><span class="shortcut-key">Enter</span><span>Fetch URL (single mode)</span></div>
     <div class="shortcut-row"><span class="shortcut-key">Ctrl+Enter</span><span>Fetch URLs (batch mode)</span></div>
     <div class="shortcut-row"><span class="shortcut-key">1 – 5</span><span>Select quality (Best → MP3)</span></div>
-    <div class="shortcut-row"><span class="shortcut-key">d</span><span>Download / ZIP selected</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">d</span><span>Download (single) / Deselect all (batch)</span></div>
     <div class="shortcut-row"><span class="shortcut-key">x</span><span>Cancel active download(s)</span></div>
-    <div class="shortcut-row"><span class="shortcut-key">a</span><span>Select all / deselect all (batch)</span></div>
-    <div class="shortcut-row"><span class="shortcut-key">z</span><span>ZIP selected (batch)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">a</span><span>Select all (batch)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">z</span><span>ZIP &amp; download selected (batch)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">c</span><span>Clear queue (batch)</span></div>
     <div class="shortcut-row"><span class="shortcut-key">Esc</span><span>Blur input / cancel download</span></div>
     <div class="shortcut-row"><span class="shortcut-key">?</span><span>Toggle this panel</span></div>
   </div>
@@ -1258,9 +1259,13 @@
         case 'd':
           if (mode === 'single' && downloadBtn.style.display !== 'none' && !downloadBtn.disabled) {
             startSingleDownload();
-          } else if (mode === 'batch' && !dlZipBtn.disabled) {
-            dlZipBtn.click();
+          } else if (mode === 'batch') {
+            queue.forEach(item => { if (item.state === 'idle') item.selected = false; });
+            renderQueue();
           }
+          break;
+        case 'c':
+          if (mode === 'batch') document.getElementById('clear-queue-btn').click();
           break;
         case 'x':
           if (activeJobId) cancelBtn.click();
