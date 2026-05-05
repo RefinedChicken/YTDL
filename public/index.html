@@ -681,9 +681,9 @@
       <label class="input-label" id="input-label">Paste YouTube URL</label>
       <div class="url-row">
         <input id="url-input" class="url-input" type="text"
-          placeholder="https://youtube.com/watch?v=..." autocomplete="off" spellcheck="false" />
+          placeholder="[/] paste URL and hit Enter..." autocomplete="off" spellcheck="false" />
         <textarea id="url-textarea" class="url-textarea" style="display:none"
-          placeholder="https://youtube.com/watch?v=...&#10;https://youtube.com/playlist?list=...&#10;https://youtu.be/..." spellcheck="false"></textarea>
+          placeholder="[/] paste URLs or playlist link, one per line... (Ctrl+Enter to fetch)" spellcheck="false"></textarea>
         <button id="fetch-btn" class="fetch-btn">Fetch</button>
       </div>
       <div class="quality-row">
@@ -885,6 +885,7 @@
       } finally {
         fetchBtn.disabled = false;
         fetchBtn.textContent = 'Fetch';
+        urlInput.blur();
       }
     }
 
@@ -936,6 +937,7 @@
       } finally {
         fetchBtn.disabled = false;
         fetchBtn.textContent = 'Fetch';
+        urlTextarea.blur();
       }
     }
 
