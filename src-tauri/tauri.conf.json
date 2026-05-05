@@ -32,10 +32,7 @@
       "../public/index.html": "public/index.html"
     },
     "macOS": {
-      "minimumSystemVersion": "11.0",
-      "infoPlist": {
-        "LSUIElement": true
-      }
+      "minimumSystemVersion": "11.0"
     },
     "windows": {
       "nsis": {
