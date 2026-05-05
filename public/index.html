@@ -589,6 +589,75 @@
     }
 
     .pulsing { animation: pulse 1.4s ease-in-out infinite; }
+
+    /* ── Keyboard shortcut badges ── */
+    .kbd {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--muted);
+      opacity: 0.55;
+      margin-left: 6px;
+      vertical-align: middle;
+      letter-spacing: 0;
+    }
+    .mode-btn.active .kbd { color: #000; opacity: 0.35; }
+    .quality-btn.active .kbd { color: var(--accent); opacity: 0.5; }
+
+    /* ── Shortcut help overlay ── */
+    #shortcut-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99;
+      background: rgba(0,0,0,0.65);
+    }
+    #shortcut-help {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px 28px;
+      z-index: 100;
+      min-width: 300px;
+      animation: slideIn 0.2s ease;
+    }
+    .shortcut-panel-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .shortcut-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+    }
+    .shortcut-close:hover { color: var(--text); }
+    .shortcut-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    .shortcut-row:last-child { border-bottom: none; }
+    .shortcut-key { color: var(--accent); min-width: 90px; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -603,8 +672,8 @@
 
     <!-- Mode toggle -->
     <div class="mode-toggle">
-      <button class="mode-btn active" id="mode-single">Single</button>
-      <button class="mode-btn" id="mode-batch">Batch</button>
+      <button class="mode-btn active" id="mode-single">Single<span class="kbd">[s]</span></button>
+      <button class="mode-btn" id="mode-batch">Batch<span class="kbd">[b]</span></button>
     </div>
 
     <!-- Input -->
@@ -612,18 +681,18 @@
       <label class="input-label" id="input-label">Paste YouTube URL</label>
       <div class="url-row">
         <input id="url-input" class="url-input" type="text"
-          placeholder="https://youtube.com/watch?v=..." autocomplete="off" spellcheck="false" />
+          placeholder="[/] paste URL and hit Enter..." autocomplete="off" spellcheck="false" />
         <textarea id="url-textarea" class="url-textarea" style="display:none"
-          placeholder="https://youtube.com/watch?v=...&#10;https://youtube.com/playlist?list=...&#10;https://youtu.be/..." spellcheck="false"></textarea>
+          placeholder="[/] paste URLs or playlist link, one per line... (Ctrl+Enter to fetch)" spellcheck="false"></textarea>
         <button id="fetch-btn" class="fetch-btn">Fetch</button>
       </div>
       <div class="quality-row">
         <span class="quality-label">Quality:</span>
-        <button class="quality-btn active" data-q="best">Best</button>
-        <button class="quality-btn" data-q="1080p">1080p</button>
-        <button class="quality-btn" data-q="720p">720p</button>
-        <button class="quality-btn" data-q="480p">480p</button>
-        <button class="quality-btn" data-q="mp3">MP3</button>
+        <button class="quality-btn active" data-q="best">Best<span class="kbd">[1]</span></button>
+        <button class="quality-btn" data-q="1080p">1080p<span class="kbd">[2]</span></button>
+        <button class="quality-btn" data-q="720p">720p<span class="kbd">[3]</span></button>
+        <button class="quality-btn" data-q="480p">480p<span class="kbd">[4]</span></button>
+        <button class="quality-btn" data-q="mp3">MP3<span class="kbd">[5]</span></button>
       </div>
     </div>
 
@@ -642,7 +711,7 @@
     </div>
 
     <!-- Single: download button -->
-    <button id="download-btn" class="download-btn"><span>⬇ Download MP4</span></button>
+    <button id="download-btn" class="download-btn"><span>⬇ Download MP4</span><span class="kbd" style="position:relative;z-index:1">[d]</span></button>
 
     <!-- Single: progress -->
     <div id="progress-area">
@@ -655,7 +724,7 @@
         <div class="progress-shimmer"></div>
       </div>
       <div id="progress-percent" class="progress-percent">0%</div>
-      <button id="cancel-btn" class="cancel-btn">✕ Cancel Download</button>
+      <button id="cancel-btn" class="cancel-btn">✕ Cancel Download<span class="kbd">[x]</span></button>
     </div>
 
     <!-- Batch: queue -->
@@ -663,9 +732,9 @@
       <div class="queue-header">
         <span class="queue-title">Queue — <span id="queue-count">0</span> video(s)</span>
         <div class="queue-actions">
-          <button class="text-btn" id="select-all-btn">Select All</button>
-          <button class="text-btn" id="deselect-all-btn">Deselect All</button>
-          <button class="text-btn danger" id="clear-queue-btn">Clear</button>
+          <button class="text-btn" id="select-all-btn">Select All<span class="kbd">[a]</span></button>
+          <button class="text-btn" id="deselect-all-btn">Deselect All<span class="kbd">[d]</span></button>
+          <button class="text-btn danger" id="clear-queue-btn">Clear<span class="kbd">[c]</span></button>
         </div>
       </div>
       <div class="queue-list" id="queue-list"></div>
@@ -673,12 +742,32 @@
 
     <!-- Batch: action bar -->
     <div id="batch-action-bar" style="display:none; margin-bottom:20px;">
-      <button class="batch-dl-btn" id="dl-zip-btn"><span id="dl-zip-label">⬇ Download Selected as ZIP (0)</span></button>
+      <button class="batch-dl-btn" id="dl-zip-btn"><span id="dl-zip-label">⬇ Download Selected as ZIP (0)</span><span class="kbd" style="position:relative;z-index:1">[z]</span></button>
     </div>
 
     <div id="status-msg"></div>
 
-    <footer>For personal use only · Respect copyright &amp; YouTube ToS</footer>
+    <footer>For personal use only · Respect copyright &amp; YouTube ToS &nbsp;·&nbsp; <span style="cursor:pointer;color:var(--muted);opacity:0.6" onclick="toggleShortcutHelp()" title="Keyboard shortcuts">[?] shortcuts</span></footer>
+  </div>
+
+  <div id="shortcut-overlay" onclick="toggleShortcutHelp()"></div>
+  <div id="shortcut-help">
+    <div class="shortcut-panel-title">
+      Keyboard Shortcuts
+      <button class="shortcut-close" onclick="toggleShortcutHelp()">×</button>
+    </div>
+    <div class="shortcut-row"><span class="shortcut-key">s / b</span><span>Switch Single / Batch mode</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">/</span><span>Focus URL input</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">Enter</span><span>Fetch URL (single mode)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">Ctrl+Enter</span><span>Fetch URLs (batch mode)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">1 – 5</span><span>Select quality (Best → MP3)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">d</span><span>Download (single) / Deselect all (batch)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">x</span><span>Cancel active download(s)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">a</span><span>Select all (batch)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">z</span><span>ZIP &amp; download selected (batch)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">c</span><span>Clear queue (batch)</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">Esc</span><span>Blur input / cancel download</span></div>
+    <div class="shortcut-row"><span class="shortcut-key">?</span><span>Toggle this panel</span></div>
   </div>
 
   <script>
@@ -743,12 +832,7 @@
 
     // ── Quality selector ───────────────────────────────────────────────────────
     document.querySelectorAll('.quality-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedQuality = btn.dataset.q;
-        downloadBtn.querySelector('span').textContent = btn.dataset.q === 'mp3' ? '⬇ Download MP3' : '⬇ Download MP4';
-      });
+      btn.addEventListener('click', () => selectQuality(btn.dataset.q));
     });
 
     // ── Status helpers ─────────────────────────────────────────────────────────
@@ -802,6 +886,7 @@
       } finally {
         fetchBtn.disabled = false;
         fetchBtn.textContent = 'Fetch';
+        urlInput.blur();
       }
     }
 
@@ -853,6 +938,7 @@
       } finally {
         fetchBtn.disabled = false;
         fetchBtn.textContent = 'Fetch';
+        urlTextarea.blur();
       }
     }
 
@@ -983,7 +1069,7 @@
           item.state = 'idle';
           item.selected = true;
           item._cancel = null;
-          finish(null);
+          finish('cancelled');
           renderQueue();
           updateBatchActionBar();
         };
@@ -1048,10 +1134,11 @@
       dlZipLabel.textContent = '⏳ Downloading...';
 
       const tokens = await Promise.all(targets.map(({ i }) => startItemDownload(i)));
-      const validTokens = tokens.filter(Boolean);
+      const validTokens = tokens.filter(t => t && t !== 'cancelled');
+      const wasCancelled = tokens.some(t => t === 'cancelled');
 
       if (validTokens.length === 0) {
-        showStatus('All downloads failed.', 'error');
+        showStatus(wasCancelled ? 'Download cancelled.' : 'All downloads failed.', 'error');
         updateBatchActionBar();
         return;
       }
@@ -1092,7 +1179,7 @@
     cancelBtn.addEventListener('click', async () => {
       if (!activeJobId) return;
       cancelBtn.disabled = true;
-      cancelBtn.textContent = 'Cancelling...';
+      cancelBtn.innerHTML = 'Cancelling...';
       try { await fetch(`/api/download/${activeJobId}`, { method: 'DELETE' }); } catch {}
       if (activeEvtSource) activeEvtSource.close();
       resetDownloadState();
@@ -1105,10 +1192,100 @@
       progressArea.style.display = 'none';
       cancelBtn.style.display = 'none';
       cancelBtn.disabled = false;
-      cancelBtn.textContent = '✕ Cancel Download';
+      cancelBtn.innerHTML = '✕ Cancel Download<span class="kbd">[x]</span>';
       downloadBtn.disabled = false;
       document.getElementById('progress-status').classList.add('pulsing');
     }
+
+    // ── Quality helper (also used by keyboard shortcuts) ───────────────────────
+    function selectQuality(q) {
+      document.querySelectorAll('.quality-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.q === q);
+      });
+      selectedQuality = q;
+      const textSpan = downloadBtn.querySelector('span:first-child');
+      if (textSpan) textSpan.textContent = q === 'mp3' ? '⬇ Download MP3' : '⬇ Download MP4';
+    }
+
+    // ── Shortcut help panel ────────────────────────────────────────────────────
+    function toggleShortcutHelp() {
+      const panel   = document.getElementById('shortcut-help');
+      const overlay = document.getElementById('shortcut-overlay');
+      const open    = panel.style.display === 'block';
+      panel.style.display   = open ? 'none' : 'block';
+      overlay.style.display = open ? 'none' : 'block';
+    }
+
+    // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+      const tag     = document.activeElement.tagName;
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable;
+
+      // Escape: blur or cancel
+      if (e.key === 'Escape') {
+        const panel = document.getElementById('shortcut-help');
+        if (panel.style.display === 'block') { toggleShortcutHelp(); return; }
+        if (inInput) { document.activeElement.blur(); return; }
+        if (activeJobId) cancelBtn.click();
+        queue.forEach(item => { if (item._cancel) item._cancel(); });
+        return;
+      }
+
+      // / : focus URL input (not when already typing)
+      if (e.key === '/' && !inInput) {
+        e.preventDefault();
+        if (mode === 'single') urlInput.focus();
+        else urlTextarea.focus();
+        return;
+      }
+
+      // Ctrl+Enter in textarea: fetch batch
+      if (e.key === 'Enter' && e.ctrlKey && document.activeElement === urlTextarea) {
+        fetchBatch();
+        return;
+      }
+
+      // Remaining shortcuts: only fire when not in an input
+      if (inInput) return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      switch (e.key) {
+        case 's': setMode('single'); break;
+        case 'b': setMode('batch');  break;
+        case '1': selectQuality('best');  break;
+        case '2': selectQuality('1080p'); break;
+        case '3': selectQuality('720p');  break;
+        case '4': selectQuality('480p');  break;
+        case '5': selectQuality('mp3');   break;
+        case 'd':
+          if (mode === 'single' && downloadBtn.style.display !== 'none' && !downloadBtn.disabled) {
+            startSingleDownload();
+          } else if (mode === 'batch') {
+            queue.forEach(item => { if (item.state === 'idle') item.selected = false; });
+            renderQueue();
+          }
+          break;
+        case 'c':
+          if (mode === 'batch') document.getElementById('clear-queue-btn').click();
+          break;
+        case 'x':
+          if (activeJobId) cancelBtn.click();
+          queue.forEach(item => { if (item._cancel) item._cancel(); });
+          break;
+        case 'a':
+          if (mode === 'batch') {
+            queue.forEach(item => { if (item.state === 'idle') item.selected = true; });
+            renderQueue();
+          }
+          break;
+        case 'z':
+          if (mode === 'batch' && !dlZipBtn.disabled) dlZipBtn.click();
+          break;
+        case '?':
+          toggleShortcutHelp();
+          break;
+      }
+    });
 
     downloadBtn.addEventListener('click', startSingleDownload);
 
