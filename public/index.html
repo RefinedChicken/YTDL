@@ -1069,7 +1069,7 @@
           item.state = 'idle';
           item.selected = true;
           item._cancel = null;
-          finish(null);
+          finish('cancelled');
           renderQueue();
           updateBatchActionBar();
         };
@@ -1134,10 +1134,11 @@
       dlZipLabel.textContent = '⏳ Downloading...';
 
       const tokens = await Promise.all(targets.map(({ i }) => startItemDownload(i)));
-      const validTokens = tokens.filter(Boolean);
+      const validTokens = tokens.filter(t => t && t !== 'cancelled');
+      const wasCancelled = tokens.some(t => t === 'cancelled');
 
       if (validTokens.length === 0) {
-        showStatus('All downloads failed.', 'error');
+        showStatus(wasCancelled ? 'Download cancelled.' : 'All downloads failed.', 'error');
         updateBatchActionBar();
         return;
       }
@@ -1273,9 +1274,7 @@
           break;
         case 'a':
           if (mode === 'batch') {
-            const idleItems  = queue.filter(i => i.state === 'idle');
-            const allChecked = idleItems.length > 0 && idleItems.every(i => i.selected);
-            queue.forEach(item => { if (item.state === 'idle') item.selected = !allChecked; });
+            queue.forEach(item => { if (item.state === 'idle') item.selected = true; });
             renderQueue();
           }
           break;
