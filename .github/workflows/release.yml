@@ -77,13 +77,6 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ffmpeg
 
-      # ── Icons ─────────────────────────────────────────────────────────────────
-      - name: Generate app icon
-        run: node scripts/generate-icons.js
-
-      - name: Generate all Tauri icon sizes
-        run: npx @tauri-apps/cli@latest icon src-tauri/icons/icon.png
-
       # ── Node SEA binary ───────────────────────────────────────────────────────
       - name: Bundle server.js
         run: node scripts/bundle.js
