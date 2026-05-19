@@ -17,22 +17,21 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             ytdlp-asset: yt-dlp
-            ffmpeg-pkg: ffmpeg
-            binary-ext: ''
             sea-extra-flags: ''
 
           - os: macos-latest
             target: aarch64-apple-darwin
             ytdlp-asset: yt-dlp_macos
-            ffmpeg-pkg: ffmpeg
-            binary-ext: ''
             sea-extra-flags: '--macho-segment-name NODE_SEA'
 
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ytdlp-asset: yt-dlp.exe
-            ffmpeg-pkg: ffmpeg
-            binary-ext: '.exe'
+            sea-extra-flags: ''
+
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            ytdlp-asset: yt-dlp_win_arm64.exe
             sea-extra-flags: ''
 
     runs-on: ${{ matrix.os }}
@@ -78,16 +77,11 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ffmpeg
 
-      # ── Windows system deps ───────────────────────────────────────────────────
-      - name: Install Windows system dependencies
-        if: runner.os == 'Windows'
-        run: choco install ffmpeg --no-progress -y
-
       # ── Icons ─────────────────────────────────────────────────────────────────
       - name: Generate app icon
         run: node scripts/generate-icons.js
 
-      - name: Generate all icon sizes
+      - name: Generate all Tauri icon sizes
         run: npx @tauri-apps/cli@latest icon src-tauri/icons/icon.png
 
       # ── Node SEA binary ───────────────────────────────────────────────────────
@@ -101,37 +95,36 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          mkdir -p src-tauri/binaries
           NODE_BIN=$(which node)
 
-          # macOS: strip existing codesign before injection
+          # macOS requires removing the existing codesign before injection
           if [ "$RUNNER_OS" = "macOS" ]; then
             codesign --remove-signature "$NODE_BIN"
           fi
 
-          cp "$NODE_BIN" src-tauri/binaries/ytdl-server-${{ matrix.target }}
+          cp "$NODE_BIN" src-tauri/ytdl-server-${{ matrix.target }}
+
           npx postject \
-            src-tauri/binaries/ytdl-server-${{ matrix.target }} \
+            src-tauri/ytdl-server-${{ matrix.target }} \
             NODE_SEA_BLOB dist/sea-prep.blob \
             --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 \
             ${{ matrix.sea-extra-flags }}
 
-          # Re-sign on macOS (ad-hoc — no cert required, bypasses Gatekeeper local check)
+          # Ad-hoc re-sign (no cert needed; satisfies Gatekeeper for local execution)
           if [ "$RUNNER_OS" = "macOS" ]; then
-            codesign --sign - src-tauri/binaries/ytdl-server-${{ matrix.target }}
+            codesign --sign - src-tauri/ytdl-server-${{ matrix.target }}
           fi
 
-          chmod +x src-tauri/binaries/ytdl-server-${{ matrix.target }}
+          chmod +x src-tauri/ytdl-server-${{ matrix.target }}
 
       - name: Create SEA binary (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/binaries | Out-Null
           $nodePath = (Get-Command node).Source
-          Copy-Item $nodePath "src-tauri/binaries/ytdl-server-${{ matrix.target }}.exe"
+          Copy-Item $nodePath "src-tauri/ytdl-server-${{ matrix.target }}.exe"
           npx postject `
-            "src-tauri/binaries/ytdl-server-${{ matrix.target }}.exe" `
+            "src-tauri/ytdl-server-${{ matrix.target }}.exe" `
             NODE_SEA_BLOB dist/sea-prep.blob `
             --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
 
@@ -142,8 +135,8 @@ jobs:
         run: |
           curl -L \
             "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${{ matrix.ytdlp-asset }}" \
-            -o "src-tauri/binaries/yt-dlp-${{ matrix.target }}"
-          chmod +x "src-tauri/binaries/yt-dlp-${{ matrix.target }}"
+            -o "src-tauri/yt-dlp-${{ matrix.target }}"
+          chmod +x "src-tauri/yt-dlp-${{ matrix.target }}"
 
       - name: Download yt-dlp (Windows)
         if: runner.os == 'Windows'
@@ -151,22 +144,31 @@ jobs:
         run: |
           Invoke-WebRequest `
             -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${{ matrix.ytdlp-asset }}" `
-            -OutFile "src-tauri/binaries/yt-dlp-${{ matrix.target }}.exe"
+            -OutFile "src-tauri/yt-dlp-${{ matrix.target }}.exe"
 
       # ── ffmpeg sidecar ────────────────────────────────────────────────────────
+      # Linux / macOS: copy the system ffmpeg (installed above via apt/brew)
       - name: Copy ffmpeg sidecar (Linux / macOS)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          cp "$(which ffmpeg)" "src-tauri/binaries/ffmpeg-${{ matrix.target }}"
-          chmod +x "src-tauri/binaries/ffmpeg-${{ matrix.target }}"
+          cp "$(which ffmpeg)" "src-tauri/ffmpeg-${{ matrix.target }}"
+          chmod +x "src-tauri/ffmpeg-${{ matrix.target }}"
 
-      - name: Copy ffmpeg sidecar (Windows)
+      # Windows: download a real static ffmpeg build from BtbN (NOT the Chocolatey shim,
+      # which is a wrapper that won't work when invoked by full path outside Chocolatey).
+      - name: Download static ffmpeg (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $ffmpeg = (Get-Command ffmpeg).Source
-          Copy-Item $ffmpeg "src-tauri/binaries/ffmpeg-${{ matrix.target }}.exe"
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-tmp
+          $ffmpegExe = Get-ChildItem -Recurse ffmpeg-tmp -Filter ffmpeg.exe |
+            Where-Object { $_.DirectoryName -like "*bin*" } |
+            Select-Object -First 1
+          Copy-Item $ffmpegExe.FullName "src-tauri/ffmpeg-${{ matrix.target }}.exe"
+          Remove-Item ffmpeg.zip, ffmpeg-tmp -Recurse -Force
 
       # ── Tauri build ───────────────────────────────────────────────────────────
       - name: Build Tauri app
@@ -182,13 +184,15 @@ jobs:
             | Platform | File |
             |----------|------|
             | macOS (Apple Silicon) | `.dmg` |
-            | Windows | `_x64-setup.exe` (installer) |
+            | Windows (x64) | `_x64-setup.exe` (NSIS installer) |
+            | Windows (ARM64) | `_arm64-setup.exe` (NSIS installer) |
             | Linux | `.AppImage` |
 
             **macOS:** Right-click → Open if Gatekeeper warns "unidentified developer".
             **Windows:** Click "More info → Run anyway" on the SmartScreen prompt.
 
             App runs as a background tray agent. Left-click the tray icon to open the web UI in your browser.
+            If something goes wrong on first launch, check `%APPDATA%\com.ytdl.app\ytdl-error.log`.
           releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}

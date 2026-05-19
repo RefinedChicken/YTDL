@@ -24,9 +24,9 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/ytdl-server",
-      "binaries/yt-dlp",
-      "binaries/ffmpeg"
+      "ytdl-server",
+      "yt-dlp",
+      "ffmpeg"
     ],
     "resources": {
       "../public/index.html": "public/index.html"
