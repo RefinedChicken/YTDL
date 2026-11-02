@@ -1,0 +1,7 @@
+services:
+  ytdl:
+    build: .
+    container_name: ytdl
+    restart: unless-stopped
+    ports:
+      - "1000:80"
