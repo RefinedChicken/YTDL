@@ -41,8 +41,21 @@ async function cleanupOldFiles() {
   }
 }
 
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com']);
+const VIDEO_ID = /^[\w-]{11}$/;
+
 function isValidYouTubeUrl(url) {
-  return /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=[\w-]{11}|shorts\/[\w-]{11}|playlist\?list=[\w-]+)|youtu\.be\/[\w-]{11})([?&].+)?$/.test(url);
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+
+  if (u.hostname === 'youtu.be') return VIDEO_ID.test(u.pathname.slice(1));
+  if (!YOUTUBE_HOSTS.has(u.hostname)) return false;
+
+  if (u.pathname === '/watch') return VIDEO_ID.test(u.searchParams.get('v') || '');
+  if (u.pathname === '/playlist') return /^[\w-]+$/.test(u.searchParams.get('list') || '');
+  const m = u.pathname.match(/^\/(shorts|live|embed)\/([^/]+)\/?$/);
+  return !!m && VIDEO_ID.test(m[2]);
 }
 
 function isPlaylistUrl(url) {
